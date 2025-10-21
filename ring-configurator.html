@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Ring Configurator - RepliCAD</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .controls-panel {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            padding: 30px;
+            border-radius: 15px;
+            width: 350px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls-panel h2 {
+            margin-bottom: 25px;
+            color: #764ba2;
+            font-size: 1.5rem;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .value-display {
+            display: inline-block;
+            background: #f0f0f0;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #764ba2;
+            margin-left: 10px;
+        }
+
+        .viewer-container {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #764ba2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-panel {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-panel h3 {
+            color: #764ba2;
+            margin-bottom: 10px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 8px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #777;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 5px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔷 Interactive Ring Configurator</h1>
+        <p>Design your custom ring with real-time 3D preview</p>
+    </div>
+
+    <div class="main-container">
+        <div class="controls-panel">
+            <h2>Ring Parameters</h2>
+
+            <div class="control-group">
+                <label>
+                    Outer Diameter (mm)
+                    <span class="value-display" id="outerDiameter-value">20</span>
+                </label>
+                <input type="range" id="outerDiameter" min="15" max="30" value="20" step="0.5">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Inner Diameter (mm)
+                    <span class="value-display" id="innerDiameter-value">17</span>
+                </label>
+                <input type="range" id="innerDiameter" min="10" max="25" value="17" step="0.5">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Ring Height (mm)
+                    <span class="value-display" id="height-value">6</span>
+                </label>
+                <input type="range" id="height" min="2" max="12" value="6" step="0.5">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Fillet Radius (mm)
+                    <span class="value-display" id="filletRadius-value">0.5</span>
+                </label>
+                <input type="range" id="filletRadius" min="0.1" max="2" value="0.5" step="0.1">
+            </div>
+
+            <div class="control-group" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+                <h3 style="color: #764ba2; margin-bottom: 15px; font-size: 1.2rem;">Scene & Lighting</h3>
+
+                <label>
+                    Ring Height (mm)
+                    <span class="value-display" id="ringHeight-value">-4.0</span>
+                </label>
+                <input type="range" id="ringHeight" min="-20" max="20" value="-4" step="0.5">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Ambient Light
+                    <span class="value-display" id="ambientLight-value">0.10</span>
+                </label>
+                <input type="range" id="ambientLight" min="0" max="1" value="0.1" step="0.05">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Main Light Intensity
+                    <span class="value-display" id="mainLight-value">3.00</span>
+                </label>
+                <input type="range" id="mainLight" min="0" max="3" value="3.0" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Fill Light Intensity
+                    <span class="value-display" id="fillLight-value">0.40</span>
+                </label>
+                <input type="range" id="fillLight" min="0" max="1" value="0.4" step="0.05">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    HDRI Environment Intensity
+                    <span class="value-display" id="envIntensity-value">1.00</span>
+                </label>
+                <input type="range" id="envIntensity" min="0" max="2" value="1" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Exposure
+                    <span class="value-display" id="exposure-value">1.00</span>
+                </label>
+                <input type="range" id="exposure" min="0" max="3" value="1.0" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Ground Brightness
+                    <span class="value-display" id="groundBrightness-value">0.40</span>
+                </label>
+                <input type="range" id="groundBrightness" min="0" max="2" value="0.4" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Animate Lights
+                    <input type="checkbox" id="animateLights" checked style="margin-left: 10px; vertical-align: middle;">
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Animation Speed
+                    <span class="value-display" id="animSpeed-value">0.10</span>
+                </label>
+                <input type="range" id="animSpeed" min="0.1" max="3" value="0.1" step="0.1">
+            </div>
+
+            <div class="control-group" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+                <h3 style="color: #764ba2; margin-bottom: 15px; font-size: 1.2rem;">Preview Style</h3>
+
+                <label>
+                    Ghost Opacity
+                    <span class="value-display" id="ghostOpacity-value">0.3</span>
+                </label>
+                <input type="range" id="ghostOpacity" min="0" max="0.8" value="0.3" step="0.05">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Ghost Color
+                    <span class="value-display" id="ghostColor-value">#000000</span>
+                </label>
+                <input type="color" id="ghostColor" value="#000000" style="width: 100%; height: 35px; border-radius: 5px; border: 1px solid #ddd;">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Wire Color
+                    <span class="value-display" id="wireColor-value">#000000</span>
+                </label>
+                <input type="color" id="wireColor" value="#000000" style="width: 100%; height: 35px; border-radius: 5px; border: 1px solid #ddd;">
+            </div>
+
+            <div class="info-panel">
+                <h3>Ring Properties</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Width</div>
+                        <div class="info-value" id="width-info">1.5 mm</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Ring Size (US)</div>
+                        <div class="info-value" id="size-info">~7</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Volume</div>
+                        <div class="info-value" id="volume-info">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Update Time</div>
+                        <div class="info-value" id="update-time">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="viewer-container">
+            <div class="loading-overlay" id="loading">
+                <div class="loading-spinner"></div>
+            </div>
+            <canvas id="canvas"></canvas>
+        </div>
+    </div>
+
+    <script type="module" src="/src/ring-configurator.js"></script>
+</body>
+</html>
