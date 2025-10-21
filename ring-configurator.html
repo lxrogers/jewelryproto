@@ -62,14 +62,15 @@
         }
 
         .control-group {
-            margin-bottom: 25px;
+            margin-bottom: 15px;
         }
 
         .control-group label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 5px;
             font-weight: 600;
             color: #555;
+            font-size: 13px;
         }
 
         .control-group input[type="range"] {
@@ -242,6 +243,17 @@
                 <input type="range" id="filletRadius" min="0.1" max="2" value="0.5" step="0.1">
             </div>
 
+            <div class="control-group">
+                <label>
+                    Mesh Quality
+                    <span class="value-display" id="meshQuality-value">High</span>
+                </label>
+                <input type="range" id="meshQuality" min="1" max="5" value="4" step="1">
+                <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                    1=Draft, 2=Low, 3=Medium, 4=High, 5=Ultra
+                </div>
+            </div>
+
             <div class="control-group" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
                 <h3 style="color: #764ba2; margin-bottom: 15px; font-size: 1.2rem;">Scene & Lighting</h3>
 
@@ -315,8 +327,23 @@
                 <input type="range" id="animSpeed" min="0.1" max="3" value="0.1" step="0.1">
             </div>
 
-            <div class="control-group" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-                <h3 style="color: #764ba2; margin-bottom: 15px; font-size: 1.2rem;">Preview Style</h3>
+            <div class="control-group">
+                <label>
+                    Point Lights (Soft Shadows)
+                    <input type="checkbox" id="pointLightsToggle" checked style="margin-left: 10px; vertical-align: middle;">
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Point Light Intensity
+                    <span class="value-display" id="pointLightIntensity-value">3.00</span>
+                </label>
+                <input type="range" id="pointLightIntensity" min="0" max="5" value="3.0" step="0.1">
+            </div>
+
+            <div class="control-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
+                <h3 style="color: #764ba2; margin-bottom: 10px; font-size: 1.1rem;">Preview Style</h3>
 
                 <label>
                     Ghost Opacity

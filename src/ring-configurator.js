@@ -25,6 +25,7 @@ let ambientLight = null;
 let sideLight = null;
 let sideLight2 = null;  // Second directional light
 let fillLight = null;
+let pointLights = [];  // Array of point lights for soft shadows
 let hdrEnvironment = null;  // Store the HDRI texture
 let environmentIntensity = 1.0;  // Store environment intensity
 
@@ -42,6 +43,16 @@ let previewSettings = {
     ghostOpacity: 0.3,      // User's preferred opacity
     ghostColor: 0x000000,   // Black ghost
     wireColor: 0x000000     // Black wireframe
+};
+
+// Mesh quality settings
+let meshQuality = 4;  // Default to "High" (1-5 scale)
+const qualityPresets = {
+    1: { tolerance: 0.1, angularTolerance: 30, name: 'Draft' },
+    2: { tolerance: 0.05, angularTolerance: 20, name: 'Low' },
+    3: { tolerance: 0.01, angularTolerance: 15, name: 'Medium' },
+    4: { tolerance: 0.005, angularTolerance: 8, name: 'High' },
+    5: { tolerance: 0.002, angularTolerance: 5, name: 'Ultra' }
 };
 
 // Create a soft gradient texture for contact shadow
@@ -201,9 +212,9 @@ function initThreeJS() {
     const planeGeometry = new THREE.PlaneGeometry(200, 200);
     const planeMaterial = new THREE.MeshStandardMaterial({
         color: new THREE.Color(0.4, 0.4, 0.4),  // User's preferred ground brightness
-        roughness: 0.8,       // Slightly rough for realistic look
-        metalness: 0.0,
-        envMapIntensity: 0.0  // Disable environment contribution for ground - only direct lighting
+        roughness: 1.0,       // Fully matte/diffuse surface
+        metalness: 0.0,       // No metallic reflection
+        envMapIntensity: 0.0  // No environment reflections on ground
     });
     groundPlane = new THREE.Mesh(planeGeometry, planeMaterial);
     groundPlane.rotation.x = -Math.PI / 2;  // Rotate to horizontal
@@ -276,6 +287,31 @@ function initThreeJS() {
     fillLight.position.set(-30, 10, -10);
     scene.add(fillLight);
 
+    // Add point lights around the ring for softer, more diffused shadows
+    // These simulate studio softbox lighting - positioned closer and stronger
+    const pointLightPositions = [
+        { x: 12, y: 15, z: 12 },   // Front right (closer)
+        { x: -12, y: 15, z: 12 },  // Front left (closer)
+        { x: 0, y: 18, z: 0 },     // Directly above (closer)
+        { x: 12, y: 12, z: -12 },  // Back right (closer)
+        { x: -12, y: 12, z: -12 }  // Back left (closer)
+    ];
+
+    pointLightPositions.forEach((pos, index) => {
+        const pointLight = new THREE.PointLight(0xffffff, 3.0, 100);  // Much stronger intensity, wider range
+        pointLight.position.set(pos.x, pos.y, pos.z);
+        pointLight.castShadow = false;  // Disable shadows for performance - just fill light
+        pointLight.decay = 2;  // Physically accurate light falloff
+        scene.add(pointLight);
+        pointLights.push(pointLight);
+
+        // Add a visual helper to see where lights are positioned (optional)
+        // const helper = new THREE.PointLightHelper(pointLight, 1);
+        // scene.add(helper);
+    });
+
+    console.log(`Added ${pointLights.length} point lights for soft shadows`);
+
     // Handle window resize
     window.addEventListener('resize', () => {
         const width = container.clientWidth;
@@ -341,9 +377,10 @@ async function updateRing(params, usePreview = false) {
 
         // Mesh the shape for Three.js with quality-appropriate settings
         const meshStartTime = performance.now();
+        const preset = qualityPresets[meshQuality];
         const meshed = ring.mesh({
-            tolerance: usePreview ? 0.3 : 0.01,          // Ultra-high quality for final (0.01 was original)
-            angularTolerance: usePreview ? 60 : 15       // Much smoother curves (15° for high quality)
+            tolerance: usePreview ? 0.3 : preset.tolerance,
+            angularTolerance: usePreview ? 60 : preset.angularTolerance
         });
         const meshTime = performance.now() - meshStartTime;
         console.log(`Meshing (${mode}): ${meshTime.toFixed(2)}ms`);
@@ -357,6 +394,12 @@ async function updateRing(params, usePreview = false) {
         geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
         geometry.setIndex(new THREE.BufferAttribute(indices, 1));
         geometry.computeVertexNormals();
+
+        // Log polygon count
+        const vertexCount = vertices.length / 3;
+        const triangleCount = indices.length / 3;
+        console.log(`Mesh stats - Vertices: ${vertexCount}, Triangles: ${triangleCount}`);
+
         const conversionTime = performance.now() - conversionStartTime;
         console.log(`Three.js conversion: ${conversionTime.toFixed(2)}ms`);
 
@@ -369,7 +412,8 @@ async function updateRing(params, usePreview = false) {
                 metalness: 1.0,       // Full metallic
                 roughness: 0.0,       // Mirror-like finish
                 envMapIntensity: 0.5, // Environment map influence
-                side: THREE.DoubleSide
+                side: THREE.DoubleSide,
+                flatShading: false    // Explicitly enable smooth shading
             });
 
             // Wireframe material for preview
@@ -744,6 +788,48 @@ function setupSliderListeners() {
             const value = parseFloat(e.target.value);
             document.getElementById('animSpeed-value').textContent = value.toFixed(2);
             animationSpeed = value;
+        });
+    }
+
+    // Mesh quality control
+    const meshQualitySlider = document.getElementById('meshQuality');
+    if (meshQualitySlider) {
+        meshQualitySlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            meshQuality = value;
+            const preset = qualityPresets[value];
+            document.getElementById('meshQuality-value').textContent = preset.name;
+            console.log(`Mesh quality changed to ${preset.name}: tolerance=${preset.tolerance}, angular=${preset.angularTolerance}°`);
+
+            // Trigger re-render with new quality
+            instantPreviewUpdate();
+        });
+
+        // Set initial value
+        const initialPreset = qualityPresets[meshQuality];
+        document.getElementById('meshQuality-value').textContent = initialPreset.name;
+    }
+
+    // Point lights controls
+    const pointLightsToggle = document.getElementById('pointLightsToggle');
+    if (pointLightsToggle) {
+        pointLightsToggle.addEventListener('change', (e) => {
+            const enabled = e.target.checked;
+            pointLights.forEach(light => {
+                light.visible = enabled;
+            });
+            console.log(`Point lights ${enabled ? 'enabled' : 'disabled'}`);
+        });
+    }
+
+    const pointLightIntensitySlider = document.getElementById('pointLightIntensity');
+    if (pointLightIntensitySlider) {
+        pointLightIntensitySlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('pointLightIntensity-value').textContent = value.toFixed(2);
+            pointLights.forEach(light => {
+                light.intensity = value;
+            });
         });
     }
 
