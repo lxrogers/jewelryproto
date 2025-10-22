@@ -199,6 +199,49 @@
         .hidden {
             display: none !important;
         }
+
+        /* Collapsible sections */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s;
+        }
+
+        .section-header:hover {
+            color: #667eea;
+        }
+
+        .section-header h3 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #764ba2;
+        }
+
+        .section-toggle {
+            font-size: 18px;
+            color: #764ba2;
+            transition: transform 0.3s;
+        }
+
+        .section-content {
+            max-height: 1000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .section-content.collapsed {
+            max-height: 0;
+        }
+
+        .section-header.collapsed .section-toggle {
+            transform: rotate(-90deg);
+        }
     </style>
 </head>
 <body>
@@ -209,163 +252,329 @@
 
     <div class="main-container">
         <div class="controls-panel">
-            <h2>Ring Parameters</h2>
+            <h2>Configuration</h2>
 
-            <div class="control-group">
-                <label>
-                    Outer Diameter (mm)
-                    <span class="value-display" id="outerDiameter-value">20</span>
-                </label>
-                <input type="range" id="outerDiameter" min="15" max="30" value="20" step="0.5">
+            <!-- Ring Parameters Section -->
+            <div class="section-header collapsed" onclick="toggleSection(this)">
+                <h3>Ring Parameters</h3>
+                <span class="section-toggle">▼</span>
             </div>
+            <div class="section-content collapsed">
+                <div class="control-group">
+                    <label>
+                        Outer Diameter (mm)
+                        <span class="value-display" id="outerDiameter-value">20</span>
+                    </label>
+                    <input type="range" id="outerDiameter" min="15" max="30" value="20" step="0.5">
+                </div>
 
-            <div class="control-group">
-                <label>
-                    Inner Diameter (mm)
-                    <span class="value-display" id="innerDiameter-value">17</span>
-                </label>
-                <input type="range" id="innerDiameter" min="10" max="25" value="17" step="0.5">
-            </div>
+                <div class="control-group">
+                    <label>
+                        Inner Diameter (mm)
+                        <span class="value-display" id="innerDiameter-value">17</span>
+                    </label>
+                    <input type="range" id="innerDiameter" min="10" max="25" value="17" step="0.5">
+                </div>
 
-            <div class="control-group">
-                <label>
-                    Ring Height (mm)
-                    <span class="value-display" id="height-value">6</span>
-                </label>
-                <input type="range" id="height" min="2" max="12" value="6" step="0.5">
-            </div>
+                <div class="control-group">
+                    <label>
+                        Ring Height (mm)
+                        <span class="value-display" id="height-value">6</span>
+                    </label>
+                    <input type="range" id="height" min="2" max="12" value="6" step="0.5">
+                </div>
 
-            <div class="control-group">
-                <label>
-                    Fillet Radius (mm)
-                    <span class="value-display" id="filletRadius-value">0.5</span>
-                </label>
-                <input type="range" id="filletRadius" min="0.1" max="2" value="0.5" step="0.1">
-            </div>
+                <div class="control-group">
+                    <label>
+                        Fillet Radius (mm)
+                        <span class="value-display" id="filletRadius-value">0.5</span>
+                    </label>
+                    <input type="range" id="filletRadius" min="0.1" max="2" value="0.5" step="0.1">
+                </div>
 
-            <div class="control-group">
-                <label>
-                    Mesh Quality
-                    <span class="value-display" id="meshQuality-value">High</span>
-                </label>
-                <input type="range" id="meshQuality" min="1" max="5" value="4" step="1">
-                <div style="font-size: 11px; color: #888; margin-top: 5px;">
-                    1=Draft, 2=Low, 3=Medium, 4=High, 5=Ultra
+                <div class="control-group">
+                    <label>
+                        Mesh Quality
+                        <span class="value-display" id="meshQuality-value">Extreme</span>
+                    </label>
+                    <input type="range" id="meshQuality" min="1" max="8" value="6" step="1">
+                    <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                        1=Draft, 4=High, 5=Ultra, 6=Extreme, 7=Insane, 8=Ludicrous
+                    </div>
                 </div>
             </div>
 
-            <div class="control-group" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-                <h3 style="color: #764ba2; margin-bottom: 15px; font-size: 1.2rem;">Scene & Lighting</h3>
+            <!-- Scene & Lighting Section -->
+            <div class="section-header collapsed" onclick="toggleSection(this)">
+                <h3>Scene & Lighting</h3>
+                <span class="section-toggle">▼</span>
+            </div>
+            <div class="section-content collapsed">
+                <div class="control-group">
+                    <label>
+                        Ring Position Y
+                        <span class="value-display" id="ringHeight-value">-4.0</span>
+                    </label>
+                    <input type="range" id="ringHeight" min="-20" max="20" value="-4" step="0.5">
+                </div>
 
-                <label>
-                    Ring Height (mm)
-                    <span class="value-display" id="ringHeight-value">-4.0</span>
-                </label>
-                <input type="range" id="ringHeight" min="-20" max="20" value="-4" step="0.5">
+                <div class="control-group">
+                    <label>
+                        Ambient Light
+                        <span class="value-display" id="ambientLight-value">0.10</span>
+                    </label>
+                    <input type="range" id="ambientLight" min="0" max="1" value="0.1" step="0.05">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Main Light Intensity
+                        <span class="value-display" id="mainLight-value">3.00</span>
+                    </label>
+                    <input type="range" id="mainLight" min="0" max="3" value="3.0" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Fill Light Intensity
+                        <span class="value-display" id="fillLight-value">0.40</span>
+                    </label>
+                    <input type="range" id="fillLight" min="0" max="1" value="0.4" step="0.05">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        HDRI Environment Intensity
+                        <span class="value-display" id="envIntensity-value">1.00</span>
+                    </label>
+                    <input type="range" id="envIntensity" min="0" max="2" value="1" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Exposure
+                        <span class="value-display" id="exposure-value">1.00</span>
+                    </label>
+                    <input type="range" id="exposure" min="0" max="3" value="1.0" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Ground Brightness
+                        <span class="value-display" id="groundBrightness-value">0.50</span>
+                    </label>
+                    <input type="range" id="groundBrightness" min="0" max="2" value="0.5" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Ground Gradient Middle Stop
+                        <span class="value-display" id="groundGradientMiddle-value">0.20</span>
+                    </label>
+                    <input type="range" id="groundGradientMiddle" min="0.1" max="0.9" value="0.2" step="0.05">
+                    <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                        Position of middle gray stop (0=center, 1=edge)
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Ground Gradient End Stop
+                        <span class="value-display" id="groundGradientEnd-value">3.00</span>
+                    </label>
+                    <input type="range" id="groundGradientEnd" min="0.3" max="10" value="3.0" step="0.1">
+                    <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                        How far gradient extends (lower = tighter, higher = very spread out)
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Ground Gradient Intensity
+                        <span class="value-display" id="groundGradientIntensity-value">0.80</span>
+                    </label>
+                    <input type="range" id="groundGradientIntensity" min="0" max="2" value="0.8" step="0.1">
+                    <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                        Overall white-to-gray contrast
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Animate Lights
+                        <input type="checkbox" id="animateLights" checked style="margin-left: 10px; vertical-align: middle;">
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Animation Speed
+                        <span class="value-display" id="animSpeed-value">0.10</span>
+                    </label>
+                    <input type="range" id="animSpeed" min="0.1" max="3" value="0.1" step="0.1">
+                </div>
             </div>
 
-            <div class="control-group">
-                <label>
-                    Ambient Light
-                    <span class="value-display" id="ambientLight-value">0.10</span>
-                </label>
-                <input type="range" id="ambientLight" min="0" max="1" value="0.1" step="0.05">
+            <!-- Shadows Section -->
+            <div class="section-header collapsed" onclick="toggleSection(this)">
+                <h3>Shadows</h3>
+                <span class="section-toggle">▼</span>
+            </div>
+            <div class="section-content collapsed">
+                <div class="control-group">
+                    <label>
+                        Shadow Quality
+                        <span class="value-display" id="shadowResolution-value">Very Sharp</span>
+                    </label>
+                    <input type="range" id="shadowResolution" min="1" max="4" value="4" step="1">
+                    <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                        1=Very Soft, 2=Soft, 3=Sharp, 4=Very Sharp
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Contact Shadow Intensity
+                        <span class="value-display" id="contactShadowIntensity-value">0.25</span>
+                    </label>
+                    <input type="range" id="contactShadowIntensity" min="0" max="1" value="0.25" step="0.05">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Contact Shadow Inner Radius
+                        <span class="value-display" id="contactShadowInner-value">0.70</span>
+                    </label>
+                    <input type="range" id="contactShadowInner" min="0.3" max="0.9" value="0.7" step="0.05">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Contact Shadow Outer Radius
+                        <span class="value-display" id="contactShadowOuter-value">0.80</span>
+                    </label>
+                    <input type="range" id="contactShadowOuter" min="0.8" max="1.2" value="0.8" step="0.05">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Point Lights (Fill Light)
+                        <input type="checkbox" id="pointLightsToggle" checked style="margin-left: 10px; vertical-align: middle;">
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Point Light Intensity
+                        <span class="value-display" id="pointLightIntensity-value">3.00</span>
+                    </label>
+                    <input type="range" id="pointLightIntensity" min="0" max="5" value="3.0" step="0.1">
+                </div>
             </div>
 
-            <div class="control-group">
-                <label>
-                    Main Light Intensity
-                    <span class="value-display" id="mainLight-value">3.00</span>
-                </label>
-                <input type="range" id="mainLight" min="0" max="3" value="3.0" step="0.1">
+            <!-- Rendering Section -->
+            <div class="section-header collapsed" onclick="toggleSection(this)">
+                <h3>Rendering</h3>
+                <span class="section-toggle">▼</span>
+            </div>
+            <div class="section-content collapsed">
+                <div class="control-group">
+                    <label style="display: block; margin-bottom: 10px;">
+                        Anti-Aliasing Type
+                    </label>
+                    <select id="antiAliasingType" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ddd; background: white; font-size: 14px;">
+                        <option value="none">None</option>
+                        <option value="smaa">SMAA (Fast)</option>
+                        <option value="taa" selected>TAA (High Quality)</option>
+                        <option value="both">TAA + SMAA (Ultra)</option>
+                    </select>
+                    <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                        TAA = Temporal Anti-Aliasing (smooth but may blur slightly when moving)
+                    </div>
+                </div>
             </div>
 
-            <div class="control-group">
-                <label>
-                    Fill Light Intensity
-                    <span class="value-display" id="fillLight-value">0.40</span>
-                </label>
-                <input type="range" id="fillLight" min="0" max="1" value="0.4" step="0.05">
+            <!-- Post-Processing Section -->
+            <div class="section-header collapsed" onclick="toggleSection(this)">
+                <h3>Post-Processing</h3>
+                <span class="section-toggle">▼</span>
+            </div>
+            <div class="section-content collapsed">
+                <div class="control-group">
+                    <label>
+                        Enable Vignette
+                        <input type="checkbox" id="vignetteToggle" style="margin-left: 10px; vertical-align: middle;">
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Vignette Darkness
+                        <span class="value-display" id="vignetteDarkness-value">1.20</span>
+                    </label>
+                    <input type="range" id="vignetteDarkness" min="0" max="2" value="1.2" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Vignette Size
+                        <span class="value-display" id="vignetteOffset-value">0.90</span>
+                    </label>
+                    <input type="range" id="vignetteOffset" min="0.5" max="1.5" value="0.9" step="0.05">
+                    <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                        Higher = vignette starts further from center
+                    </div>
+                </div>
+
+                <div class="control-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
+                    <label>
+                        Saturation
+                        <span class="value-display" id="saturation-value">1.00</span>
+                    </label>
+                    <input type="range" id="saturation" min="0" max="2" value="1.0" step="0.05">
+                    <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                        0 = grayscale, 1 = normal, 2 = very saturated
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Contrast
+                        <span class="value-display" id="contrast-value">1.00</span>
+                    </label>
+                    <input type="range" id="contrast" min="0.5" max="1.5" value="1.0" step="0.05">
+                </div>
             </div>
 
-            <div class="control-group">
-                <label>
-                    HDRI Environment Intensity
-                    <span class="value-display" id="envIntensity-value">1.00</span>
-                </label>
-                <input type="range" id="envIntensity" min="0" max="2" value="1" step="0.1">
+            <!-- Preview Style Section -->
+            <div class="section-header collapsed" onclick="toggleSection(this)">
+                <h3>Preview Style</h3>
+                <span class="section-toggle">▼</span>
             </div>
+            <div class="section-content collapsed">
+                <div class="control-group">
+                    <label>
+                        Ghost Opacity
+                        <span class="value-display" id="ghostOpacity-value">0.3</span>
+                    </label>
+                    <input type="range" id="ghostOpacity" min="0" max="0.8" value="0.3" step="0.05">
+                </div>
 
-            <div class="control-group">
-                <label>
-                    Exposure
-                    <span class="value-display" id="exposure-value">1.00</span>
-                </label>
-                <input type="range" id="exposure" min="0" max="3" value="1.0" step="0.1">
-            </div>
+                <div class="control-group">
+                    <label>
+                        Ghost Color
+                        <span class="value-display" id="ghostColor-value">#000000</span>
+                    </label>
+                    <input type="color" id="ghostColor" value="#000000" style="width: 100%; height: 35px; border-radius: 5px; border: 1px solid #ddd;">
+                </div>
 
-            <div class="control-group">
-                <label>
-                    Ground Brightness
-                    <span class="value-display" id="groundBrightness-value">0.40</span>
-                </label>
-                <input type="range" id="groundBrightness" min="0" max="2" value="0.4" step="0.1">
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Animate Lights
-                    <input type="checkbox" id="animateLights" checked style="margin-left: 10px; vertical-align: middle;">
-                </label>
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Animation Speed
-                    <span class="value-display" id="animSpeed-value">0.10</span>
-                </label>
-                <input type="range" id="animSpeed" min="0.1" max="3" value="0.1" step="0.1">
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Point Lights (Soft Shadows)
-                    <input type="checkbox" id="pointLightsToggle" checked style="margin-left: 10px; vertical-align: middle;">
-                </label>
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Point Light Intensity
-                    <span class="value-display" id="pointLightIntensity-value">3.00</span>
-                </label>
-                <input type="range" id="pointLightIntensity" min="0" max="5" value="3.0" step="0.1">
-            </div>
-
-            <div class="control-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
-                <h3 style="color: #764ba2; margin-bottom: 10px; font-size: 1.1rem;">Preview Style</h3>
-
-                <label>
-                    Ghost Opacity
-                    <span class="value-display" id="ghostOpacity-value">0.3</span>
-                </label>
-                <input type="range" id="ghostOpacity" min="0" max="0.8" value="0.3" step="0.05">
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Ghost Color
-                    <span class="value-display" id="ghostColor-value">#000000</span>
-                </label>
-                <input type="color" id="ghostColor" value="#000000" style="width: 100%; height: 35px; border-radius: 5px; border: 1px solid #ddd;">
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Wire Color
-                    <span class="value-display" id="wireColor-value">#000000</span>
-                </label>
-                <input type="color" id="wireColor" value="#000000" style="width: 100%; height: 35px; border-radius: 5px; border: 1px solid #ddd;">
+                <div class="control-group">
+                    <label>
+                        Wire Color
+                        <span class="value-display" id="wireColor-value">#000000</span>
+                    </label>
+                    <input type="color" id="wireColor" value="#000000" style="width: 100%; height: 35px; border-radius: 5px; border: 1px solid #ddd;">
+                </div>
             </div>
 
             <div class="info-panel">
@@ -399,6 +608,14 @@
         </div>
     </div>
 
+    <script>
+        // Toggle section collapse/expand
+        function toggleSection(header) {
+            const content = header.nextElementSibling;
+            header.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
+        }
+    </script>
     <script type="module" src="/src/ring-configurator.js"></script>
 </body>
 </html>

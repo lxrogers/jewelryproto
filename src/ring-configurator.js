@@ -1,12 +1,24 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass';
+import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass';
+import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader';
 import { setOC, makeCylinder } from 'replicad';
 import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 
 // Global variables
 let scene, camera, renderer, controls;
+let composer = null;
+let filmGrainPass = null;
+let smaaPass = null;
+let taaPass = null;
+let vignettePass = null;
+let colorGradingPass = null;
 let ringMesh = null;
 let helperMesh = null;  // Helper mesh for depth occlusion
 let groundPlane = null;  // Ground plane for shadows
@@ -46,37 +58,118 @@ let previewSettings = {
 };
 
 // Mesh quality settings
-let meshQuality = 4;  // Default to "High" (1-5 scale)
+let meshQuality = 6;  // Default to "Extreme" (1-8 scale)
 const qualityPresets = {
     1: { tolerance: 0.1, angularTolerance: 30, name: 'Draft' },
     2: { tolerance: 0.05, angularTolerance: 20, name: 'Low' },
     3: { tolerance: 0.01, angularTolerance: 15, name: 'Medium' },
     4: { tolerance: 0.005, angularTolerance: 8, name: 'High' },
-    5: { tolerance: 0.002, angularTolerance: 5, name: 'Ultra' }
+    5: { tolerance: 0.002, angularTolerance: 5, name: 'Ultra' },
+    6: { tolerance: 0.001, angularTolerance: 3, name: 'Extreme' },
+    7: { tolerance: 0.0005, angularTolerance: 2, name: 'Insane' },
+    8: { tolerance: 0.0001, angularTolerance: 1, name: 'Ludicrous' }
 };
 
-// Create a soft gradient texture for contact shadow
-function createContactShadowTexture(size = 512) {
+// Create radial gradient texture for ground plane
+function createGroundGradientTexture(size = 1024, middleStop = 0.5, endStop = 0.8, intensity = 0.8) {
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
     const context = canvas.getContext('2d');
 
-    // Create radial gradient - dark in center, transparent at edges
-    const gradient = context.createRadialGradient(
-        size / 2, size / 2, 0,  // Center point
-        size / 2, size / 2, size / 2  // Outer radius
-    );
+    const centerX = size / 2;
+    const centerY = size / 2;
+    const maxRadius = size / 2;
 
-    // Dark center that fades to transparent
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');     // Solid black at center
-    gradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.5)'); // Semi-transparent
-    gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.1)'); // Very light
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');     // Fully transparent at edges
+    // Create radial gradient from center (bright) to edges (medium gray)
+    // endStop controls how far the gradient extends
+    const gradient = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius * endStop);
+
+    // Calculate gradient colors based on intensity
+    // intensity = 1.0 gives full white-to-gray range
+    // intensity = 0.0 gives all medium gray (no gradient)
+    const white = Math.min(255, 255 * intensity);
+    const mediumGray = Math.min(255, 153 * intensity);
+    const darkGray = Math.min(255, 102 * intensity);
+
+    // Three stops: center (white), middle, and end (medium gray)
+    gradient.addColorStop(0, `rgb(${white}, ${white}, ${white})`);                 // 0% - Center: white
+    gradient.addColorStop(middleStop, `rgb(${mediumGray}, ${mediumGray}, ${mediumGray})`); // Middle
+    gradient.addColorStop(1, `rgb(${darkGray}, ${darkGray}, ${darkGray})`);        // 100% - End: darker gray
 
     context.fillStyle = gradient;
     context.fillRect(0, 0, size, size);
 
+    return canvas;
+}
+
+// Create a soft gradient texture for contact shadow (ring-shaped)
+function createContactShadowTexture(size = 512, innerRatio = 0.7, outerRatio = 1.0) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d');
+
+    const centerX = size / 2;
+    const centerY = size / 2;
+    const maxRadius = size / 2;
+
+    // Draw radial gradient for each pixel to create ring shape
+    const imageData = context.createImageData(size, size);
+    const data = imageData.data;
+
+    // Blur width for soft edges (as percentage of ring width)
+    const ringWidth = outerRatio - innerRatio;
+    const blurAmount = ringWidth * 0.3;  // 30% of ring width for blur
+
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const dx = x - centerX;
+            const dy = y - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const normalizedDistance = distance / maxRadius;
+
+            const index = (y * size + x) * 4;
+
+            // Create ring-shaped shadow with soft blur on both edges
+            let alpha = 0;
+
+            // Inner blur region
+            const innerBlurStart = innerRatio - blurAmount;
+            const innerBlurEnd = innerRatio + blurAmount;
+
+            // Outer blur region
+            const outerBlurStart = outerRatio - blurAmount;
+            const outerBlurEnd = outerRatio + blurAmount;
+
+            if (normalizedDistance < innerBlurStart) {
+                // Inside inner blur - transparent
+                alpha = 0;
+            } else if (normalizedDistance >= innerBlurStart && normalizedDistance < innerBlurEnd) {
+                // Inner blur region - fade in from transparent
+                const blurPosition = (normalizedDistance - innerBlurStart) / (blurAmount * 2);
+                alpha = Math.min(1.0, blurPosition * 2) * 0.8;
+            } else if (normalizedDistance >= innerBlurEnd && normalizedDistance < outerBlurStart) {
+                // Middle of ring - solid shadow
+                alpha = 0.8;
+            } else if (normalizedDistance >= outerBlurStart && normalizedDistance < outerBlurEnd) {
+                // Outer blur region - fade out to transparent
+                const blurPosition = (normalizedDistance - outerBlurStart) / (blurAmount * 2);
+                alpha = Math.max(0, (1.0 - blurPosition) * 2) * 0.8;
+            } else {
+                // Outside outer blur - transparent
+                alpha = 0;
+            }
+
+            // Set pixel color (black with varying alpha)
+            data[index] = 0;       // R
+            data[index + 1] = 0;   // G
+            data[index + 2] = 0;   // B
+            data[index + 3] = alpha * 255;  // A
+        }
+    }
+
+    context.putImageData(imageData, 0, 0);
     return canvas;
 }
 
@@ -186,7 +279,7 @@ function initThreeJS() {
     // Camera setup - positioned for better view of flat ring
     const aspect = container.clientWidth / container.clientHeight;
     camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
-    camera.position.set(30, 40, 30);  // Higher and closer for flat ring view
+    camera.position.set(50, 60, 50);  // Zoomed out more for better overview
 
     // Renderer setup with enhanced quality
     renderer = new THREE.WebGLRenderer({
@@ -197,7 +290,7 @@ function initThreeJS() {
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);  // Use device pixel ratio for sharper rendering
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;  // PCF Soft Shadow Map
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;  // Updated to match user's preferred setting
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -208,10 +301,15 @@ function initThreeJS() {
     controls.dampingFactor = 0.05;
     controls.target.set(0, 0, 0);
 
-    // Add ground plane - white surface for the ring to sit on
-    const planeGeometry = new THREE.PlaneGeometry(200, 200);
+    // Add ground plane with radial gradient texture
+    const planeGeometry = new THREE.PlaneGeometry(600, 600);  // 3x larger (was 200, now 600)
+
+    // Create gradient texture with default parameters (middleStop=0.2, endStop=3.0, intensity=0.8)
+    const groundGradientTexture = new THREE.CanvasTexture(createGroundGradientTexture(1024, 0.2, 3.0, 0.8));
+    groundGradientTexture.needsUpdate = true;
+
     const planeMaterial = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(0.4, 0.4, 0.4),  // User's preferred ground brightness
+        map: groundGradientTexture,  // Apply gradient texture
         roughness: 1.0,       // Fully matte/diffuse surface
         metalness: 0.0,       // No metallic reflection
         envMapIntensity: 0.0  // No environment reflections on ground
@@ -222,6 +320,24 @@ function initThreeJS() {
     groundPlane.receiveShadow = true;
     groundPlane.castShadow = false;  // Ground shouldn't cast shadows
     scene.add(groundPlane);
+
+    // Add soft contact shadow where ring touches ground
+    const shadowTexture = new THREE.CanvasTexture(createContactShadowTexture(512, 0.7, 0.8));
+    shadowTexture.needsUpdate = true;
+    const contactShadowGeometry = new THREE.PlaneGeometry(25, 25);  // Size of shadow
+    const contactShadowMaterial = new THREE.MeshBasicMaterial({
+        map: shadowTexture,
+        transparent: true,
+        opacity: 0.25,  // Shadow darkness
+        depthWrite: false,
+        color: 0x000000
+    });
+    contactShadow = new THREE.Mesh(contactShadowGeometry, contactShadowMaterial);
+    contactShadow.rotation.x = -Math.PI / 2;  // Lay flat
+    contactShadow.position.y = -9.9;  // Slightly above ground to reduce z-fighting
+    contactShadow.renderOrder = -1;  // Render before other objects
+    scene.add(contactShadow);
+    console.log('Contact shadow added to scene');
 
     // Load HDRI environment map
     const rgbeLoader = new RGBELoader();
@@ -243,7 +359,7 @@ function initThreeJS() {
         // Optionally use as background too (comment out for black background)
         // scene.background = hdrEquirect;
 
-        console.log('HDRI environment loaded, intensity:', currentEnvIntensity);
+        console.log('HDRI environment loaded (studio_small.hdr), intensity:', currentEnvIntensity);
     });
 
     // Add very minimal ambient light for base visibility
@@ -254,30 +370,30 @@ function initThreeJS() {
     sideLight = new THREE.DirectionalLight(0xffffff, 3.0);  // Set to user's preferred intensity
     sideLight.position.set(-20, 35, -20);  // Behind and to the left, casting shadows forward
     sideLight.castShadow = true;
-    sideLight.shadow.mapSize.width = 4096;  // Higher resolution shadows
+    sideLight.shadow.mapSize.width = 4096;  // Very Sharp by default
     sideLight.shadow.mapSize.height = 4096;
     sideLight.shadow.camera.near = 0.1;
-    sideLight.shadow.camera.far = 100;
-    sideLight.shadow.camera.left = -30;
-    sideLight.shadow.camera.right = 30;
-    sideLight.shadow.camera.top = 30;
-    sideLight.shadow.camera.bottom = -30;
-    sideLight.shadow.bias = -0.0001;  // Adjusted for better shadow accuracy
-    sideLight.shadow.normalBias = 0.02;  // Help prevent shadow acne
+    sideLight.shadow.camera.far = 200;
+    sideLight.shadow.camera.left = -60;
+    sideLight.shadow.camera.right = 60;
+    sideLight.shadow.camera.top = 60;
+    sideLight.shadow.camera.bottom = -60;
+    sideLight.shadow.bias = -0.0001;
+    sideLight.shadow.normalBias = 0.02;
     scene.add(sideLight);
 
     // Second directional light - from behind right
     sideLight2 = new THREE.DirectionalLight(0xffffff, 3.0);  // Set to user's preferred intensity
     sideLight2.position.set(20, 35, -20);  // Behind and to the right, casting shadows forward
     sideLight2.castShadow = true;
-    sideLight2.shadow.mapSize.width = 4096;  // Higher resolution shadows
+    sideLight2.shadow.mapSize.width = 4096;  // Very Sharp by default
     sideLight2.shadow.mapSize.height = 4096;
     sideLight2.shadow.camera.near = 0.1;
-    sideLight2.shadow.camera.far = 100;
-    sideLight2.shadow.camera.left = -30;
-    sideLight2.shadow.camera.right = 30;
-    sideLight2.shadow.camera.top = 30;
-    sideLight2.shadow.camera.bottom = -30;
+    sideLight2.shadow.camera.far = 200;
+    sideLight2.shadow.camera.left = -60;
+    sideLight2.shadow.camera.right = 60;
+    sideLight2.shadow.camera.top = 60;
+    sideLight2.shadow.camera.bottom = -60;
     sideLight2.shadow.bias = -0.0001;
     sideLight2.shadow.normalBias = 0.02;
     scene.add(sideLight2);
@@ -312,6 +428,83 @@ function initThreeJS() {
 
     console.log(`Added ${pointLights.length} point lights for soft shadows`);
 
+    // Set up post-processing for photorealism
+    composer = new EffectComposer(renderer);
+
+    // Basic render pass
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    // Add TAA (Temporal Anti-Aliasing) - very high quality, enabled by default
+    taaPass = new TAARenderPass(scene, camera);
+    taaPass.sampleLevel = 3;  // Higher = more samples = better quality (0-5)
+    composer.addPass(taaPass);
+
+    // Add SMAA anti-aliasing pass (disabled by default, can be combined with TAA)
+    smaaPass = new SMAAPass(
+        container.clientWidth * window.devicePixelRatio,
+        container.clientHeight * window.devicePixelRatio
+    );
+    smaaPass.enabled = false;  // Start disabled, TAA is enabled
+    composer.addPass(smaaPass);
+
+    // Add color grading pass (saturation & contrast)
+    const ColorGradingShader = {
+        uniforms: {
+            'tDiffuse': { value: null },
+            'saturation': { value: 1.0 },
+            'contrast': { value: 1.0 }
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            precision mediump float;
+            uniform sampler2D tDiffuse;
+            uniform float saturation;
+            uniform float contrast;
+            varying vec2 vUv;
+
+            vec3 adjustSaturation(vec3 color, float adjustment) {
+                vec3 gray = vec3(dot(color, vec3(0.299, 0.587, 0.114)));
+                return mix(gray, color, adjustment);
+            }
+
+            vec3 adjustContrast(vec3 color, float adjustment) {
+                return (color - 0.5) * adjustment + 0.5;
+            }
+
+            void main() {
+                vec4 color = texture2D(tDiffuse, vUv);
+
+                // Apply saturation
+                color.rgb = adjustSaturation(color.rgb, saturation);
+
+                // Apply contrast
+                color.rgb = adjustContrast(color.rgb, contrast);
+
+                gl_FragColor = color;
+            }
+        `
+    };
+
+    colorGradingPass = new ShaderPass(ColorGradingShader);
+    composer.addPass(colorGradingPass);
+
+    // Add vignette effect (disabled by default)
+    vignettePass = new ShaderPass(VignetteShader);
+    vignettePass.uniforms['darkness'].value = 1.2;  // Vignette darkness
+    vignettePass.uniforms['offset'].value = 0.9;  // Vignette offset from center
+    vignettePass.enabled = false;  // Disabled by default
+    vignettePass.renderToScreen = true;  // This is the last pass
+    composer.addPass(vignettePass);
+
+    console.log('Post-processing enabled with TAA anti-aliasing, color grading, and vignette');
+
     // Handle window resize
     window.addEventListener('resize', () => {
         const width = container.clientWidth;
@@ -321,6 +514,7 @@ function initThreeJS() {
         camera.updateProjectionMatrix();
 
         renderer.setSize(width, height);
+        if (composer) composer.setSize(width, height);
     });
 
     // Start animation loop
@@ -352,7 +546,12 @@ function animate() {
         sideLight2.position.y = initialLightPositions.light2.y + Math.sin(angle2 * 0.5) * 5;  // Subtle vertical movement
     }
 
-    renderer.render(scene, camera);
+    // Render with post-processing
+    if (composer) {
+        composer.render();
+    } else {
+        renderer.render(scene, camera);
+    }
 }
 
 // Update ring geometry with quality mode
@@ -761,12 +960,17 @@ function setupSliderListeners() {
             const value = parseFloat(e.target.value);
             document.getElementById('groundBrightness-value').textContent = value.toFixed(2);
             if (groundPlane && groundPlane.material) {
-                // Modulate ground color brightness
+                // Modulate ground texture brightness using color property
+                // This acts as a multiplier on the texture
                 const brightness = value;
                 groundPlane.material.color.setRGB(brightness, brightness, brightness);
                 groundPlane.material.needsUpdate = true;
             }
         });
+        // Set initial color multiplier to 0.5 (darker for subtle look)
+        if (groundPlane && groundPlane.material) {
+            groundPlane.material.color.setRGB(0.5, 0.5, 0.5);
+        }
     }
 
     // Animation controls
@@ -810,6 +1014,92 @@ function setupSliderListeners() {
         document.getElementById('meshQuality-value').textContent = initialPreset.name;
     }
 
+    // Shadow quality/resolution control
+    const shadowResolutionSlider = document.getElementById('shadowResolution');
+    if (shadowResolutionSlider) {
+        const resolutionPresets = {
+            1: { size: 512, name: 'Very Soft' },   // Lower res = softer/blurrier
+            2: { size: 1024, name: 'Soft' },
+            3: { size: 2048, name: 'Sharp' },
+            4: { size: 4096, name: 'Very Sharp' }  // Higher res = sharper
+        };
+
+        shadowResolutionSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            const preset = resolutionPresets[value];
+            document.getElementById('shadowResolution-value').textContent = preset.name;
+
+            // Update shadow map size for both directional lights
+            if (sideLight && sideLight.shadow) {
+                sideLight.shadow.mapSize.width = preset.size;
+                sideLight.shadow.mapSize.height = preset.size;
+                sideLight.shadow.map?.dispose();  // Dispose old shadow map
+                sideLight.shadow.map = null;  // Force recreation
+            }
+            if (sideLight2 && sideLight2.shadow) {
+                sideLight2.shadow.mapSize.width = preset.size;
+                sideLight2.shadow.mapSize.height = preset.size;
+                sideLight2.shadow.map?.dispose();
+                sideLight2.shadow.map = null;
+            }
+
+            console.log(`Shadow quality set to ${preset.name} (${preset.size}x${preset.size})`);
+        });
+
+        // Set initial value
+        document.getElementById('shadowResolution-value').textContent = resolutionPresets[4].name;
+    }
+
+    // Contact shadow controls
+    let contactShadowInner = 0.7;
+    let contactShadowOuter = 0.8;
+
+    const contactShadowIntensitySlider = document.getElementById('contactShadowIntensity');
+    if (contactShadowIntensitySlider) {
+        contactShadowIntensitySlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('contactShadowIntensity-value').textContent = value.toFixed(2);
+
+            if (contactShadow && contactShadow.material) {
+                contactShadow.material.opacity = value;
+            }
+        });
+    }
+
+    const contactShadowInnerSlider = document.getElementById('contactShadowInner');
+    if (contactShadowInnerSlider) {
+        contactShadowInnerSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('contactShadowInner-value').textContent = value.toFixed(2);
+            contactShadowInner = value;
+
+            // Regenerate contact shadow texture
+            if (contactShadow && contactShadow.material) {
+                const newTexture = new THREE.CanvasTexture(createContactShadowTexture(512, contactShadowInner, contactShadowOuter));
+                contactShadow.material.map?.dispose();
+                contactShadow.material.map = newTexture;
+                contactShadow.material.needsUpdate = true;
+            }
+        });
+    }
+
+    const contactShadowOuterSlider = document.getElementById('contactShadowOuter');
+    if (contactShadowOuterSlider) {
+        contactShadowOuterSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('contactShadowOuter-value').textContent = value.toFixed(2);
+            contactShadowOuter = value;
+
+            // Regenerate contact shadow texture
+            if (contactShadow && contactShadow.material) {
+                const newTexture = new THREE.CanvasTexture(createContactShadowTexture(512, contactShadowInner, contactShadowOuter));
+                contactShadow.material.map?.dispose();
+                contactShadow.material.map = newTexture;
+                contactShadow.material.needsUpdate = true;
+            }
+        });
+    }
+
     // Point lights controls
     const pointLightsToggle = document.getElementById('pointLightsToggle');
     if (pointLightsToggle) {
@@ -830,6 +1120,151 @@ function setupSliderListeners() {
             pointLights.forEach(light => {
                 light.intensity = value;
             });
+        });
+    }
+
+    // Anti-aliasing type selector
+    const antiAliasingType = document.getElementById('antiAliasingType');
+    if (antiAliasingType) {
+        antiAliasingType.addEventListener('change', (e) => {
+            const type = e.target.value;
+
+            // Disable all first
+            if (taaPass) taaPass.enabled = false;
+            if (smaaPass) smaaPass.enabled = false;
+
+            // Enable based on selection
+            switch(type) {
+                case 'none':
+                    console.log('Anti-aliasing disabled');
+                    break;
+                case 'smaa':
+                    if (smaaPass) smaaPass.enabled = true;
+                    console.log('SMAA anti-aliasing enabled');
+                    break;
+                case 'taa':
+                    if (taaPass) taaPass.enabled = true;
+                    console.log('TAA anti-aliasing enabled');
+                    break;
+                case 'both':
+                    if (taaPass) taaPass.enabled = true;
+                    if (smaaPass) smaaPass.enabled = true;
+                    console.log('TAA + SMAA anti-aliasing enabled (Ultra)');
+                    break;
+            }
+        });
+    }
+
+    // Vignette toggle
+    const vignetteToggle = document.getElementById('vignetteToggle');
+    if (vignetteToggle) {
+        vignetteToggle.addEventListener('change', (e) => {
+            const enabled = e.target.checked;
+            if (vignettePass) {
+                vignettePass.enabled = enabled;
+            }
+            console.log(`Vignette ${enabled ? 'enabled' : 'disabled'}`);
+        });
+    }
+
+    // Vignette controls
+    const vignetteDarknessSlider = document.getElementById('vignetteDarkness');
+    if (vignetteDarknessSlider) {
+        vignetteDarknessSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('vignetteDarkness-value').textContent = value.toFixed(2);
+            if (vignettePass && vignettePass.uniforms) {
+                vignettePass.uniforms['darkness'].value = value;
+            }
+        });
+    }
+
+    const vignetteOffsetSlider = document.getElementById('vignetteOffset');
+    if (vignetteOffsetSlider) {
+        vignetteOffsetSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('vignetteOffset-value').textContent = value.toFixed(2);
+            if (vignettePass && vignettePass.uniforms) {
+                vignettePass.uniforms['offset'].value = value;
+            }
+        });
+    }
+
+    // Color grading controls
+    const saturationSlider = document.getElementById('saturation');
+    if (saturationSlider) {
+        saturationSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('saturation-value').textContent = value.toFixed(2);
+            if (colorGradingPass && colorGradingPass.uniforms) {
+                colorGradingPass.uniforms['saturation'].value = value;
+            }
+        });
+    }
+
+    const contrastSlider = document.getElementById('contrast');
+    if (contrastSlider) {
+        contrastSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('contrast-value').textContent = value.toFixed(2);
+            if (colorGradingPass && colorGradingPass.uniforms) {
+                colorGradingPass.uniforms['contrast'].value = value;
+            }
+        });
+    }
+
+    // Ground gradient controls - middle and end stop positions
+    const groundGradientMiddleSlider = document.getElementById('groundGradientMiddle');
+    if (groundGradientMiddleSlider) {
+        groundGradientMiddleSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('groundGradientMiddle-value').textContent = value.toFixed(2);
+
+            // Regenerate ground texture with new middle stop
+            if (groundPlane && groundPlane.material) {
+                const endStop = parseFloat(document.getElementById('groundGradientEnd').value);
+                const intensity = parseFloat(document.getElementById('groundGradientIntensity').value);
+                const newTexture = new THREE.CanvasTexture(createGroundGradientTexture(1024, value, endStop, intensity));
+                groundPlane.material.map?.dispose();
+                groundPlane.material.map = newTexture;
+                groundPlane.material.needsUpdate = true;
+            }
+        });
+    }
+
+    const groundGradientEndSlider = document.getElementById('groundGradientEnd');
+    if (groundGradientEndSlider) {
+        groundGradientEndSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('groundGradientEnd-value').textContent = value.toFixed(2);
+
+            // Regenerate ground texture with new end stop
+            if (groundPlane && groundPlane.material) {
+                const middleStop = parseFloat(document.getElementById('groundGradientMiddle').value);
+                const intensity = parseFloat(document.getElementById('groundGradientIntensity').value);
+                const newTexture = new THREE.CanvasTexture(createGroundGradientTexture(1024, middleStop, value, intensity));
+                groundPlane.material.map?.dispose();
+                groundPlane.material.map = newTexture;
+                groundPlane.material.needsUpdate = true;
+            }
+        });
+    }
+
+    const groundGradientIntensitySlider = document.getElementById('groundGradientIntensity');
+    if (groundGradientIntensitySlider) {
+        groundGradientIntensitySlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('groundGradientIntensity-value').textContent = value.toFixed(2);
+
+            // Regenerate ground texture with new intensity
+            if (groundPlane && groundPlane.material) {
+                const middleStop = parseFloat(document.getElementById('groundGradientMiddle').value);
+                const endStop = parseFloat(document.getElementById('groundGradientEnd').value);
+                const newTexture = new THREE.CanvasTexture(createGroundGradientTexture(1024, middleStop, endStop, value));
+                groundPlane.material.map?.dispose();
+                groundPlane.material.map = newTexture;
+                groundPlane.material.needsUpdate = true;
+            }
         });
     }
 
