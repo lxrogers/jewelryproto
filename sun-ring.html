@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sun Ring - RepliCAD Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #111;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .loading-overlay.hidden {
+            display: none;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #333;
+            border-top: 4px solid #FFD700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #FFD700;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 300px;
+        }
+
+        .info h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #FFD700;
+        }
+
+        .info p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+            border-radius: 10px;
+            min-width: 280px;
+        }
+
+        .controls h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #FFD700;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #333;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #FFD700;
+            cursor: pointer;
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #FFD700;
+            cursor: pointer;
+            border: none;
+        }
+
+        .value-display {
+            float: right;
+            color: #FFD700;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="loading-overlay" id="loading">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Creating jewelry...</div>
+        </div>
+
+        <div class="info">
+            <h1>☀️ Sun Ring</h1>
+            <p>
+                A flat ring with a hollow sun element attached to it.
+                This tests using RepliCAD to create complex jewelry shapes by fusing multiple geometries.
+            </p>
+        </div>
+
+        <div class="controls">
+            <h2>Parameters</h2>
+
+            <div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #333;">
+                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                    <input type="text" id="presetName" placeholder="Preset name..." style="flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #444; background: #222; color: white; font-size: 13px;">
+                    <button id="savePreset" style="padding: 8px 12px; border-radius: 5px; border: none; background: #FFD700; color: #000; font-weight: 600; cursor: pointer; font-size: 13px;">Save</button>
+                </div>
+                <select id="presetList" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #444; background: #222; color: white; font-size: 13px; margin-bottom: 8px;">
+                    <option value="">-- Select Preset --</option>
+                </select>
+                <div style="display: flex; gap: 8px;">
+                    <button id="loadPreset" style="flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #FFD700; background: transparent; color: #FFD700; cursor: pointer; font-size: 12px;">Load</button>
+                    <button id="deletePreset" style="flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ff4444; background: transparent; color: #ff4444; cursor: pointer; font-size: 12px;">Delete</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Ring Width
+                    <span class="value-display" id="ringWidth-value">2.2 mm</span>
+                </label>
+                <input type="range" id="ringWidth" min="0.5" max="15" value="2.2" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Height (All Elements)
+                    <span class="value-display" id="height-value">1.0 mm</span>
+                </label>
+                <input type="range" id="height" min="0.5" max="10" value="1" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Fillet Radius
+                    <span class="value-display" id="filletRadius-value">0.3 mm</span>
+                </label>
+                <input type="range" id="filletRadius" min="0" max="2" value="0.3" step="0.05">
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #333;">
+                <h3 style="color: #FFD700; font-size: 14px; margin-bottom: 10px;">☀️ Sun</h3>
+
+                <div class="control-group">
+                    <label>
+                        Sun Diameter
+                        <span class="value-display" id="sunDiameter-value">12.0 mm</span>
+                    </label>
+                    <input type="range" id="sunDiameter" min="5" max="30" value="12" step="0.5">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Sun Width (Ring Thickness)
+                        <span class="value-display" id="sunWidth-value">2.0 mm</span>
+                    </label>
+                    <input type="range" id="sunWidth" min="0.5" max="8" value="2" step="0.1">
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #333;">
+                <h3 style="color: #FFD700; font-size: 14px; margin-bottom: 10px;">🌙 Moon</h3>
+
+                <div class="control-group">
+                    <label>
+                        Moon Diameter
+                        <span class="value-display" id="moonDiameter-value">8.0 mm</span>
+                    </label>
+                    <input type="range" id="moonDiameter" min="3" max="20" value="8" step="0.5">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Moon Position (Angle)
+                        <span class="value-display" id="moonAngle-value">180°</span>
+                    </label>
+                    <input type="range" id="moonAngle" min="0" max="360" value="180" step="5">
+                </div>
+            </div>
+        </div>
+
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script type="module" src="/src/sun-ring.js"></script>
+</body>
+</html>
