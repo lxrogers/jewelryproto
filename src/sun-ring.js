@@ -8,7 +8,18 @@ import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url
 // Global variables
 let scene, camera, renderer, controls;
 let ringMesh = null;
+let moonMesh = null;  // Separate mesh for the moon
 let isInitialized = false;
+
+// Animation variables
+let isAnimating = false;
+let animationStartTime = 0;
+let animationStartAngle = 0;
+let animationTargetAngle = 0;
+let animationDuration = 2000; // 2 seconds in ms
+let lastFrameTime = 0;
+let frameCount = 0;
+let totalBuildTime = 0;
 
 // Dimensions (in mm) - will be updated from sliders
 const RING_DIAMETER = 25;  // 1 inch = 25.4mm
@@ -35,9 +46,9 @@ async function initializeReplicad() {
     }
 }
 
-// Create the sun ring with hollow center and moon
-async function createSunRingShape() {
-    console.log('Creating sun ring jewelry...');
+// Create just the ring with sun (no moon - moon is separate)
+async function createRingWithSun() {
+    console.log('Creating ring with sun...');
 
     // Main flat ring (torus shape)
     const outerRadius = RING_DIAMETER / 2;
@@ -74,41 +85,18 @@ async function createSunRingShape() {
     mainRing = mainRing.cut(sunPunchTranslated);
     console.log('Punched hole for sun through main ring');
 
-    // === MOON ELEMENT (solid) ===
-    // Calculate moon position based on angle
-    const moonAngleRad = (MOON_ANGLE * Math.PI) / 180;
-    const moonPositionX = ringCenterlineRadius * Math.cos(moonAngleRad);
-    const moonPositionY = ringCenterlineRadius * Math.sin(moonAngleRad);
-
-    // Create moon as a solid cylinder
-    const moonRadius = MOON_DIAMETER / 2;
-    const moon = makeCylinder(moonRadius, HEIGHT);
-    console.log('Moon element created');
-
-    // Position the moon
-    const moonTranslated = moon.translate(moonPositionX, moonPositionY, 0);
-
-    // Punch through the main ring where the moon will be
-    const moonPunchCylinder = makeCylinder(moonRadius, HEIGHT);
-    const moonPunchTranslated = moonPunchCylinder.translate(moonPositionX, moonPositionY, 0);
-
-    mainRing = mainRing.cut(moonPunchTranslated);
-    console.log('Punched hole for moon through main ring');
-
-    // Fuse sun and moon with the main ring
+    // Fuse sun with the main ring
     let combinedShape = mainRing.fuse(sunTranslated);
-    combinedShape = combinedShape.fuse(moonTranslated);
-    console.log('Sun and moon fused with main ring');
+    console.log('Sun fused with main ring');
 
-    // Apply fillet to all edges - this will round the top and bottom faces
-    if (FILLET_RADIUS > 0.01) {  // Only apply if radius is meaningful
+    // Apply fillet to all edges
+    if (FILLET_RADIUS > 0.01) {
         try {
             combinedShape = combinedShape.fillet(FILLET_RADIUS);
             console.log(`Applied fillet with radius ${FILLET_RADIUS.toFixed(3)}mm`);
         } catch (error) {
             console.warn('Fillet failed, trying with smaller radius:', error);
             try {
-                // Try with a smaller radius if the first attempt fails
                 const smallerRadius = FILLET_RADIUS * 0.5;
                 combinedShape = combinedShape.fillet(smallerRadius);
                 console.log(`Applied smaller fillet with radius ${smallerRadius.toFixed(3)}mm`);
@@ -119,6 +107,33 @@ async function createSunRingShape() {
     }
 
     return combinedShape;
+}
+
+// Create moon as separate geometry (at origin)
+async function createMoonGeometry() {
+    console.log('Creating moon geometry at origin...');
+    const moonRadius = MOON_DIAMETER / 2;
+    let moon = makeCylinder(moonRadius, HEIGHT);
+
+    // Apply fillet to moon edges
+    if (FILLET_RADIUS > 0.01) {
+        try {
+            moon = moon.fillet(FILLET_RADIUS);
+            console.log(`Applied fillet to moon with radius ${FILLET_RADIUS.toFixed(3)}mm`);
+        } catch (error) {
+            console.warn('Moon fillet failed, trying with smaller radius:', error);
+            try {
+                const smallerRadius = FILLET_RADIUS * 0.5;
+                moon = moon.fillet(smallerRadius);
+                console.log(`Applied smaller fillet to moon with radius ${smallerRadius.toFixed(3)}mm`);
+            } catch (error2) {
+                console.warn('Could not apply fillet to moon, continuing without it:', error2);
+            }
+        }
+    }
+
+    console.log('Moon geometry created');
+    return moon;
 }
 
 // Initialize Three.js scene
@@ -207,17 +222,109 @@ function animate() {
     renderer.render(scene, camera);
 }
 
+// Easing function: ease-in-out (starts slow, speeds up, slows down)
+function easeInOutCubic(t) {
+    return t < 0.5
+        ? 4 * t * t * t
+        : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// Start animation test
+function startAnimationTest() {
+    if (isAnimating) {
+        console.log('Animation already running');
+        return;
+    }
+
+    if (!moonMesh) {
+        console.log('Moon mesh not yet created. Please wait for initialization to complete.');
+        return;
+    }
+
+    isAnimating = true;
+    animationStartTime = performance.now();
+    animationStartAngle = MOON_ANGLE;
+    animationTargetAngle = MOON_ANGLE + 20; // Move 20 degrees
+    frameCount = 0;
+    totalBuildTime = 0;
+    lastFrameTime = animationStartTime;
+
+    console.log('=== ANIMATION TEST STARTED (Three.js Transform) ===');
+    console.log(`Moving moon from ${animationStartAngle}° to ${animationTargetAngle}° over ${animationDuration}ms`);
+    console.log('Using Three.js transforms - no RepliCAD rebuilds!');
+    console.log('Target: 60 FPS (16.67ms per frame)');
+
+    animateFrame();
+}
+
+// Animate a single frame using Three.js transforms (no RepliCAD rebuild)
+function animateFrame() {
+    if (!isAnimating) return;
+
+    const currentTime = performance.now();
+    const elapsed = currentTime - animationStartTime;
+    const progress = Math.min(elapsed / animationDuration, 1.0);
+
+    // Apply easing
+    const easedProgress = easeInOutCubic(progress);
+
+    // Calculate new angle
+    const angleDelta = animationTargetAngle - animationStartAngle;
+    MOON_ANGLE = animationStartAngle + (angleDelta * easedProgress);
+
+    // Update UI
+    document.getElementById('moonAngle').value = MOON_ANGLE;
+    document.getElementById('moonAngle-value').textContent = MOON_ANGLE.toFixed(0) + '°';
+
+    // Update moon position using Three.js transform (instant!)
+    const transformStartTime = performance.now();
+    updateMoonPosition();
+    const transformTime = performance.now() - transformStartTime;
+
+    frameCount++;
+
+    const frameTime = currentTime - lastFrameTime;
+    const fps = frameTime > 0 ? 1000 / frameTime : 0;
+    lastFrameTime = currentTime;
+
+    console.log(`Frame ${frameCount}: Angle=${MOON_ANGLE.toFixed(1)}° | Transform=${transformTime.toFixed(3)}ms | Frame=${frameTime.toFixed(1)}ms | FPS=${fps.toFixed(1)}`);
+
+    // Continue animation or finish
+    if (progress < 1.0) {
+        requestAnimationFrame(animateFrame);
+    } else {
+        isAnimating = false;
+        const totalTime = performance.now() - animationStartTime;
+        const avgFPS = (frameCount / totalTime) * 1000;
+
+        console.log('=== ANIMATION TEST COMPLETE ===');
+        console.log(`Total frames: ${frameCount}`);
+        console.log(`Total time: ${totalTime.toFixed(0)}ms`);
+        console.log(`Average FPS: ${avgFPS.toFixed(1)}`);
+        console.log(`Target achieved: ${avgFPS >= 30 ? '✓ 30+ FPS' : '✗ Below 30 FPS'}`);
+        console.log(`60 FPS capable: ${avgFPS >= 60 ? '✓ YES' : '✗ NO'}`);
+    }
+}
+
 // Create and add the ring to the scene
 async function createAndDisplayRing() {
     try {
-        document.getElementById('loading').classList.remove('hidden');
+        if (!isAnimating) {
+            document.getElementById('loading').classList.remove('hidden');
+        }
 
-        // Create the shape using RepliCAD
-        const shape = await createSunRingShape();
+        // Create the ring+sun shape using RepliCAD
+        const buildStartTime = performance.now();
+        const ringShape = await createRingWithSun();
+        const buildTime = performance.now() - buildStartTime;
 
-        // Mesh the shape
-        console.log('Meshing shape...');
-        const meshed = shape.mesh({
+        if (!isAnimating) {
+            console.log(`RepliCAD ring+sun build time: ${buildTime.toFixed(1)}ms`);
+        }
+
+        // Mesh the ring+sun shape
+        console.log('Meshing ring+sun shape...');
+        const meshed = ringShape.mesh({
             tolerance: 0.01,
             angularTolerance: 15
         });
@@ -231,7 +338,7 @@ async function createAndDisplayRing() {
         geometry.setIndex(new THREE.BufferAttribute(indices, 1));
         geometry.computeVertexNormals();
 
-        console.log(`Mesh created - Vertices: ${vertices.length / 3}, Triangles: ${indices.length / 3}`);
+        console.log(`Ring mesh created - Vertices: ${vertices.length / 3}, Triangles: ${indices.length / 3}`);
 
         // Create material
         const material = new THREE.MeshStandardMaterial({
@@ -253,7 +360,52 @@ async function createAndDisplayRing() {
         ringMesh.receiveShadow = true;
         scene.add(ringMesh);
 
-        console.log('Ring added to scene');
+        console.log('Ring+sun added to scene');
+
+        // Create moon as separate mesh if it doesn't exist yet
+        if (!moonMesh) {
+            const moonBuildStart = performance.now();
+            const moonGeometry = await createMoonGeometry();
+            const moonBuildTime = performance.now() - moonBuildStart;
+            console.log(`RepliCAD moon build time: ${moonBuildTime.toFixed(1)}ms`);
+
+            // Mesh the moon
+            console.log('Meshing moon...');
+            const moonMeshed = moonGeometry.mesh({
+                tolerance: 0.01,
+                angularTolerance: 15
+            });
+
+            // Convert to Three.js geometry
+            const moonVertices = new Float32Array(moonMeshed.vertices);
+            const moonIndices = new Uint32Array(moonMeshed.triangles);
+
+            const moonGeometryThree = new THREE.BufferGeometry();
+            moonGeometryThree.setAttribute('position', new THREE.BufferAttribute(moonVertices, 3));
+            moonGeometryThree.setIndex(new THREE.BufferAttribute(moonIndices, 1));
+            moonGeometryThree.computeVertexNormals();
+
+            console.log(`Moon mesh created - Vertices: ${moonVertices.length / 3}, Triangles: ${moonIndices.length / 3}`);
+
+            // Create moon mesh with same material
+            const moonMaterial = new THREE.MeshStandardMaterial({
+                color: 0xFFD700,  // Gold
+                metalness: 1.0,
+                roughness: 0.2,
+                envMapIntensity: 1.0
+            });
+
+            moonMesh = new THREE.Mesh(moonGeometryThree, moonMaterial);
+            moonMesh.castShadow = true;
+            moonMesh.receiveShadow = true;
+            scene.add(moonMesh);
+
+            console.log('Moon mesh created and added to scene');
+        }
+
+        // Position moon using Three.js transforms
+        updateMoonPosition();
+
         document.getElementById('loading').classList.add('hidden');
 
     } catch (error) {
@@ -261,6 +413,31 @@ async function createAndDisplayRing() {
         document.getElementById('loading').classList.add('hidden');
         alert('Error: ' + error.message);
     }
+}
+
+// Update moon position using Three.js transforms (no RepliCAD rebuild)
+function updateMoonPosition() {
+    if (!moonMesh) return;
+
+    // Calculate position on ring circumference
+    const outerRadius = RING_DIAMETER / 2;
+    const innerRadius = outerRadius - RING_WIDTH;
+    const ringCenterlineRadius = (outerRadius + innerRadius) / 2;
+
+    // Convert angle to radians
+    const angleRad = (MOON_ANGLE * Math.PI) / 180;
+
+    // Calculate X, Z position on the ring circumference (Y is vertical)
+    const x = ringCenterlineRadius * Math.cos(angleRad);
+    const z = ringCenterlineRadius * Math.sin(angleRad);
+
+    // Position moon at the calculated position
+    moonMesh.position.set(x, 0, z);
+
+    // Rotate to lay flat like the ring
+    moonMesh.rotation.set(Math.PI / 2, 0, 0);
+
+    console.log(`Moon positioned at angle ${MOON_ANGLE.toFixed(0)}° (x=${x.toFixed(2)}, z=${z.toFixed(2)})`);
 }
 
 // Preset management functions
@@ -401,19 +578,72 @@ function setupPresetButtons() {
     updatePresetList();
 }
 
+// Rebuild just the moon mesh (when diameter changes)
+async function rebuildMoonMesh() {
+    try {
+        console.log('Rebuilding moon mesh...');
+
+        // Remove old moon mesh
+        if (moonMesh) {
+            scene.remove(moonMesh);
+            moonMesh.geometry.dispose();
+            moonMesh.material.dispose();
+            moonMesh = null;
+        }
+
+        // Create new moon geometry
+        const moonGeometry = await createMoonGeometry();
+
+        // Mesh the moon
+        const moonMeshed = moonGeometry.mesh({
+            tolerance: 0.01,
+            angularTolerance: 15
+        });
+
+        // Convert to Three.js geometry
+        const moonVertices = new Float32Array(moonMeshed.vertices);
+        const moonIndices = new Uint32Array(moonMeshed.triangles);
+
+        const moonGeometryThree = new THREE.BufferGeometry();
+        moonGeometryThree.setAttribute('position', new THREE.BufferAttribute(moonVertices, 3));
+        moonGeometryThree.setIndex(new THREE.BufferAttribute(moonIndices, 1));
+        moonGeometryThree.computeVertexNormals();
+
+        // Create moon mesh with same material
+        const moonMaterial = new THREE.MeshStandardMaterial({
+            color: 0xFFD700,  // Gold
+            metalness: 1.0,
+            roughness: 0.2,
+            envMapIntensity: 1.0
+        });
+
+        moonMesh = new THREE.Mesh(moonGeometryThree, moonMaterial);
+        moonMesh.castShadow = true;
+        moonMesh.receiveShadow = true;
+        scene.add(moonMesh);
+
+        // Position it
+        updateMoonPosition();
+
+        console.log('Moon mesh rebuilt');
+    } catch (error) {
+        console.error('Error rebuilding moon mesh:', error);
+    }
+}
+
 // Setup slider event listeners
 function setupSliders() {
     const sliders = [
-        { id: 'ringWidth', variable: 'RING_WIDTH', suffix: ' mm' },
-        { id: 'height', variable: 'HEIGHT', suffix: ' mm' },
-        { id: 'sunDiameter', variable: 'SUN_DIAMETER', suffix: ' mm' },
-        { id: 'sunWidth', variable: 'SUN_THICKNESS', suffix: ' mm' },
-        { id: 'moonDiameter', variable: 'MOON_DIAMETER', suffix: ' mm' },
-        { id: 'moonAngle', variable: 'MOON_ANGLE', suffix: '°' },
-        { id: 'filletRadius', variable: 'FILLET_RADIUS', suffix: ' mm' }
+        { id: 'ringWidth', variable: 'RING_WIDTH', suffix: ' mm', updateType: 'ring' },
+        { id: 'height', variable: 'HEIGHT', suffix: ' mm', updateType: 'both' },
+        { id: 'sunDiameter', variable: 'SUN_DIAMETER', suffix: ' mm', updateType: 'ring' },
+        { id: 'sunWidth', variable: 'SUN_THICKNESS', suffix: ' mm', updateType: 'ring' },
+        { id: 'moonDiameter', variable: 'MOON_DIAMETER', suffix: ' mm', updateType: 'moon' },
+        { id: 'moonAngle', variable: 'MOON_ANGLE', suffix: '°', updateType: 'transform' },
+        { id: 'filletRadius', variable: 'FILLET_RADIUS', suffix: ' mm', updateType: 'both' }  // Fillet affects both ring and moon
     ];
 
-    sliders.forEach(({ id, variable, suffix }) => {
+    sliders.forEach(({ id, variable, suffix, updateType }) => {
         const slider = document.getElementById(id);
         const valueDisplay = document.getElementById(id + '-value');
 
@@ -431,9 +661,20 @@ function setupSliders() {
             else if (variable === 'MOON_ANGLE') MOON_ANGLE = value;
             else if (variable === 'FILLET_RADIUS') FILLET_RADIUS = value;
 
-            // Recreate the ring with new parameters
             if (isInitialized) {
-                createAndDisplayRing();
+                if (updateType === 'ring') {
+                    // Rebuild ring+sun only
+                    createAndDisplayRing();
+                } else if (updateType === 'moon') {
+                    // Rebuild moon mesh only
+                    rebuildMoonMesh();
+                } else if (updateType === 'both') {
+                    // Rebuild everything (height affects both)
+                    createAndDisplayRing();
+                } else if (updateType === 'transform') {
+                    // Just update moon position (fast Three.js transform)
+                    updateMoonPosition();
+                }
             }
         });
     });
@@ -467,3 +708,6 @@ async function initializeApp() {
 initializeApp().catch(error => {
     console.error('Failed to initialize application:', error);
 });
+
+// Expose animation test function globally for the button
+window.startAnimationTest = startAnimationTest;

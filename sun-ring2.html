@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sun Ring - RepliCAD Test</title>
+    <title>Sun Ring - Advanced Rendering</title>
     <style>
         * {
             margin: 0;
@@ -97,7 +97,9 @@
             background: rgba(0, 0, 0, 0.85);
             padding: 20px;
             border-radius: 10px;
-            min-width: 280px;
+            width: 240px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
         }
 
         .controls h2 {
@@ -150,6 +152,26 @@
             color: #FFD700;
             font-weight: 600;
         }
+
+        .section-divider {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+        }
+
+        .controls::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .controls::-webkit-scrollbar-track {
+            background: #222;
+            border-radius: 4px;
+        }
+
+        .controls::-webkit-scrollbar-thumb {
+            background: #FFD700;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -162,19 +184,12 @@
         <div class="info">
             <h1>☀️ Sun Ring</h1>
             <p>
-                A flat ring with a hollow sun element attached to it.
-                This tests using RepliCAD to create complex jewelry shapes by fusing multiple geometries.
-            </p>
-            <button onclick="startAnimationTest()" style="margin-top: 15px; padding: 10px 20px; background: #FFD700; color: #000; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; width: 100%;">
-                🎬 Test Animation (Three.js)
-            </button>
-            <p style="font-size: 11px; color: #888; margin-top: 8px;">
-                Animates moon 20° over 2 seconds using Three.js transforms (no RepliCAD rebuild). Check console for FPS metrics.
+                Advanced rendering with HDRI lighting, post-processing, and real-time Three.js animation.
             </p>
         </div>
 
         <div class="controls">
-            <h2>Parameters</h2>
+            <h2>Jewelry Parameters</h2>
 
             <div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #333;">
                 <div style="display: flex; gap: 8px; margin-bottom: 10px;">
@@ -193,9 +208,9 @@
             <div class="control-group">
                 <label>
                     Ring Width
-                    <span class="value-display" id="ringWidth-value">2.2 mm</span>
+                    <span class="value-display" id="ringWidth-value">1.5 mm</span>
                 </label>
-                <input type="range" id="ringWidth" min="0.5" max="15" value="2.2" step="0.1">
+                <input type="range" id="ringWidth" min="0.5" max="15" value="1.5" step="0.1">
             </div>
 
             <div class="control-group">
@@ -209,40 +224,40 @@
             <div class="control-group">
                 <label>
                     Fillet Radius
-                    <span class="value-display" id="filletRadius-value">0.3 mm</span>
+                    <span class="value-display" id="filletRadius-value">0.30 mm</span>
                 </label>
                 <input type="range" id="filletRadius" min="0" max="2" value="0.3" step="0.05">
             </div>
 
-            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #333;">
+            <div class="section-divider">
                 <h3 style="color: #FFD700; font-size: 14px; margin-bottom: 10px;">☀️ Sun</h3>
 
                 <div class="control-group">
                     <label>
                         Sun Diameter
-                        <span class="value-display" id="sunDiameter-value">12.0 mm</span>
+                        <span class="value-display" id="sunDiameter-value">7.5 mm</span>
                     </label>
-                    <input type="range" id="sunDiameter" min="5" max="30" value="12" step="0.5">
+                    <input type="range" id="sunDiameter" min="5" max="30" value="7.5" step="0.5">
                 </div>
 
                 <div class="control-group">
                     <label>
                         Sun Width (Ring Thickness)
-                        <span class="value-display" id="sunWidth-value">2.0 mm</span>
+                        <span class="value-display" id="sunWidth-value">1.4 mm</span>
                     </label>
-                    <input type="range" id="sunWidth" min="0.5" max="8" value="2" step="0.1">
+                    <input type="range" id="sunWidth" min="0.5" max="8" value="1.4" step="0.1">
                 </div>
             </div>
 
-            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #333;">
+            <div class="section-divider">
                 <h3 style="color: #FFD700; font-size: 14px; margin-bottom: 10px;">🌙 Moon</h3>
 
                 <div class="control-group">
                     <label>
                         Moon Diameter
-                        <span class="value-display" id="moonDiameter-value">8.0 mm</span>
+                        <span class="value-display" id="moonDiameter-value">4.0 mm</span>
                     </label>
-                    <input type="range" id="moonDiameter" min="3" max="20" value="8" step="0.5">
+                    <input type="range" id="moonDiameter" min="3" max="20" value="4" step="0.5">
                 </div>
 
                 <div class="control-group">
@@ -252,12 +267,60 @@
                     </label>
                     <input type="range" id="moonAngle" min="0" max="360" value="180" step="5">
                 </div>
+
+                <div class="control-group">
+                    <label>
+                        Moon Height
+                        <span class="value-display" id="moonHeight-value">1.00 mm</span>
+                    </label>
+                    <input type="range" id="moonHeight" min="0.5" max="10" value="1.0" step="0.01">
+                </div>
+            </div>
+
+            <div class="section-divider">
+                <h3 style="color: #FFD700; font-size: 14px; margin-bottom: 10px;">🎨 Color Grading</h3>
+
+                <div class="control-group">
+                    <label>
+                        Saturation
+                        <span class="value-display" id="saturation-value">0.85</span>
+                    </label>
+                    <input type="range" id="saturation" min="0" max="2" value="0.85" step="0.01">
+                </div>
+
+                <div class="control-group">
+                    <label>
+                        Contrast
+                        <span class="value-display" id="contrast-value">0.90</span>
+                    </label>
+                    <input type="range" id="contrast" min="0" max="2" value="0.90" step="0.01">
+                </div>
+            </div>
+
+            <div class="section-divider">
+                <h3 style="color: #FFD700; font-size: 14px; margin-bottom: 10px;">🎬 Animation</h3>
+
+                <div class="control-group">
+                    <label>
+                        Animation Degrees
+                        <span class="value-display" id="animationDegrees-value">360°</span>
+                    </label>
+                    <input type="range" id="animationDegrees" min="0" max="720" value="360" step="15">
+                </div>
+
+                <button id="startAnimation" style="width: 100%; padding: 12px; border-radius: 5px; border: none; background: #FFD700; color: #000; font-weight: 600; cursor: pointer; font-size: 14px; margin-top: 10px;">
+                    ▶️ Start Animation
+                </button>
+
+                <p style="font-size: 11px; color: #888; margin-top: 8px; line-height: 1.4;">
+                    Animates moon rotation over 2 seconds using Three.js transforms. Smooth 60 FPS performance.
+                </p>
             </div>
         </div>
 
         <canvas id="canvas"></canvas>
     </div>
 
-    <script type="module" src="/src/sun-ring.js"></script>
+    <script type="module" src="/src/sun-ring2.js"></script>
 </body>
 </html>
