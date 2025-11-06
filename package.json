@@ -14,12 +14,14 @@
   "type": "commonjs",
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.4",
+    "gl-catmull-clark": "^1.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "replicad": "^0.20.2",
     "replicad-opencascadejs": "^0.20.2",
     "replicad-threejs-helper": "^0.20.0",
     "three": "^0.180.0",
+    "three-subdivide": "^1.1.5",
     "vite": "^7.1.9"
   }
 }

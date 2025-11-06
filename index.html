@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Jewelry Prototypes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #aaa;
+            margin-bottom: 50px;
+        }
+
+        .prototypes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .prototype-card {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #333;
+            border-radius: 15px;
+            padding: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .prototype-card:hover {
+            border-color: #FFD700;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.2);
+        }
+
+        .prototype-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .prototype-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #FFD700;
+        }
+
+        .prototype-description {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .prototype-tag {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 5px 12px;
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 20px;
+            font-size: 11px;
+            color: #FFD700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .new-badge {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: rgba(76, 175, 80, 0.5);
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔷 3D Jewelry Prototypes</h1>
+        <p class="subtitle">RepliCAD + Three.js Exploration</p>
+
+        <div class="prototypes">
+            <a href="/ring-configurator.html" class="prototype-card">
+                <span class="prototype-icon">💍</span>
+                <h2 class="prototype-title">Ring Configurator</h2>
+                <p class="prototype-description">
+                    Interactive ring designer with mesh quality controls, preview/high-quality modes,
+                    and post-processing effects. Features advanced lighting and shadow systems.
+                </p>
+                <span class="prototype-tag">Interactive</span>
+                <span class="prototype-tag">Quality Presets</span>
+            </a>
+
+            <a href="/sun-ring.html" class="prototype-card">
+                <span class="prototype-icon">☀️</span>
+                <h2 class="prototype-title">Sun Ring</h2>
+                <p class="prototype-description">
+                    A flat ring with a hollow sun element and separate moon component.
+                    Tests geometry fusion and independent animation using Three.js transforms.
+                </p>
+                <span class="prototype-tag">Boolean Ops</span>
+                <span class="prototype-tag">Animation</span>
+            </a>
+
+            <a href="/sun-ring2.html" class="prototype-card">
+                <span class="prototype-icon">🌙</span>
+                <h2 class="prototype-title">Sun Ring 2</h2>
+                <p class="prototype-description">
+                    Enhanced version with animated directional lights and advanced photorealistic
+                    rendering. Demonstrates dynamic lighting effects on jewelry.
+                </p>
+                <span class="prototype-tag">Enhanced</span>
+                <span class="prototype-tag">Lighting</span>
+            </a>
+
+            <a href="/smoothing-test.html" class="prototype-card">
+                <span class="prototype-icon">🔮</span>
+                <h2 class="prototype-title">Smoothing Test</h2>
+                <p class="prototype-description">
+                    Compare subdivision smoothing algorithms on highly triangulated Replicad geometry.
+                    Test Loop subdivision and Catmull-Clark with adjustable iterations.
+                </p>
+                <span class="prototype-tag new-badge">NEW</span>
+                <span class="prototype-tag">Algorithms</span>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
