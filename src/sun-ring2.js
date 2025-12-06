@@ -52,6 +52,7 @@ let MOON_DIAMETER = 4.0;
 let MOON_ANGLE = 180;
 let MOON_HEIGHT = 1.0;  // Separate height for moon
 let FILLET_RADIUS = 0.3;
+let MODEL_Y_OFFSET = 0;  // Vertical offset from ground
 
 // Animation test variables
 let isAnimating = false;
@@ -501,7 +502,7 @@ async function createAndDisplayJewelry() {
 
         ringMesh = new THREE.Mesh(geometry, material);
         ringMesh.rotation.x = Math.PI / 2;
-        ringMesh.position.y = HEIGHT / 2;  // Raise by half height so bottom touches ground
+        ringMesh.position.y = HEIGHT / 2 + MODEL_Y_OFFSET;  // Raise by half height + offset
         ringMesh.castShadow = true;
         ringMesh.receiveShadow = true;
         scene.add(ringMesh);
@@ -602,8 +603,16 @@ function updateMoonPosition() {
     const x = ringCenterlineRadius * Math.cos(angleRad);
     const z = ringCenterlineRadius * Math.sin(angleRad);
 
-    moonMesh.position.set(x, MOON_HEIGHT / 2, z);  // Raise by half moon height so bottom touches ground
+    moonMesh.position.set(x, MOON_HEIGHT / 2 + MODEL_Y_OFFSET, z);  // Raise by half moon height + offset
     moonMesh.rotation.set(Math.PI / 2, 0, 0);
+}
+
+// Update all model positions (ring + moon) when offset changes
+function updateModelPositions() {
+    if (ringMesh) {
+        ringMesh.position.y = HEIGHT / 2 + MODEL_Y_OFFSET;
+    }
+    updateMoonPosition();
 }
 
 // Easing function: ease-in-out cubic
@@ -819,7 +828,8 @@ function setupSliders() {
         { id: 'moonDiameter', variable: 'MOON_DIAMETER', suffix: ' mm', updateType: 'moon', decimals: 1 },
         { id: 'moonAngle', variable: 'MOON_ANGLE', suffix: '°', updateType: 'transform', decimals: 0 },
         { id: 'moonHeight', variable: 'MOON_HEIGHT', suffix: ' mm', updateType: 'moon', decimals: 2 },
-        { id: 'filletRadius', variable: 'FILLET_RADIUS', suffix: ' mm', updateType: 'both', decimals: 2 }
+        { id: 'filletRadius', variable: 'FILLET_RADIUS', suffix: ' mm', updateType: 'both', decimals: 2 },
+        { id: 'modelYOffset', variable: 'MODEL_Y_OFFSET', suffix: ' mm', updateType: 'position', decimals: 1 }
     ];
 
     sliders.forEach(({ id, variable, suffix, updateType, decimals }) => {
@@ -840,6 +850,7 @@ function setupSliders() {
             else if (variable === 'MOON_ANGLE') MOON_ANGLE = value;
             else if (variable === 'MOON_HEIGHT') MOON_HEIGHT = value;
             else if (variable === 'FILLET_RADIUS') FILLET_RADIUS = value;
+            else if (variable === 'MODEL_Y_OFFSET') MODEL_Y_OFFSET = value;
 
             if (isInitialized) {
                 if (updateType === 'ring') {
@@ -850,6 +861,8 @@ function setupSliders() {
                     createAndDisplayJewelry();
                 } else if (updateType === 'transform') {
                     updateMoonPosition();
+                } else if (updateType === 'position') {
+                    updateModelPositions();
                 }
             }
         });
