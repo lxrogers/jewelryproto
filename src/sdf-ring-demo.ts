@@ -14,6 +14,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass';
 import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass';
 import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader';
+import Stats from 'three/examples/jsm/libs/stats.module';
 import GUI from 'lil-gui';
 import { setWasmUrl, getManifoldModule } from 'manifold-3d/lib/wasm';
 
@@ -69,6 +70,7 @@ let animationTime = 0;
 
 // Stats display
 let statsElement: HTMLElement;
+let stats: Stats;
 let lastUpdateTime = 0;
 
 // Debounce timer
@@ -103,6 +105,10 @@ const params = {
   color: '#FFD700',
   metalness: 1.0,
   roughness: 0.0,
+
+  // Rendering
+  aaMode: 'SMAA', // Options: 'None', 'SMAA', 'MSAA', 'TAA'
+  taaLevel: 3,    // 1-5
 };
 
 // ============ HELPERS ============
@@ -490,6 +496,10 @@ function initThreeJS(): void {
   const canvas = document.getElementById('canvas') as HTMLCanvasElement;
   container = canvas.parentElement!;
 
+  // FPS Stats
+  stats = new Stats();
+  document.body.appendChild(stats.dom);
+
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000000);
 
@@ -503,7 +513,7 @@ function initThreeJS(): void {
     powerPreference: 'high-performance',
   });
   renderer.setSize(container.clientWidth, container.clientHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -548,8 +558,8 @@ function initThreeJS(): void {
   sideLight = new THREE.DirectionalLight(0xffffff, 3.0);
   sideLight.position.set(initialLightPositions.light1.x, initialLightPositions.light1.y, initialLightPositions.light1.z);
   sideLight.castShadow = true;
-  sideLight.shadow.mapSize.width = 4096;
-  sideLight.shadow.mapSize.height = 4096;
+  sideLight.shadow.mapSize.width = 2048;
+  sideLight.shadow.mapSize.height = 2048;
   sideLight.shadow.camera.near = 0.1;
   sideLight.shadow.camera.far = 200;
   sideLight.shadow.camera.left = -60;
@@ -563,8 +573,8 @@ function initThreeJS(): void {
   sideLight2 = new THREE.DirectionalLight(0xffffff, 3.0);
   sideLight2.position.set(initialLightPositions.light2.x, initialLightPositions.light2.y, initialLightPositions.light2.z);
   sideLight2.castShadow = true;
-  sideLight2.shadow.mapSize.width = 4096;
-  sideLight2.shadow.mapSize.height = 4096;
+  sideLight2.shadow.mapSize.width = 2048;
+  sideLight2.shadow.mapSize.height = 2048;
   sideLight2.shadow.camera.near = 0.1;
   sideLight2.shadow.camera.far = 200;
   sideLight2.shadow.camera.left = -60;
@@ -597,22 +607,54 @@ function initThreeJS(): void {
   });
 
   // Post-processing pipeline
-  composer = new EffectComposer(renderer);
+  setupComposer();
 
-  const renderPass = new RenderPass(scene, camera);
-  composer.addPass(renderPass);
+  // Handle resize
+  window.addEventListener('resize', () => {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+    setupComposer(); // Recreate composer on resize to match dimensions
+  });
+}
 
-  taaPass = new TAARenderPass(scene, camera);
-  taaPass.sampleLevel = 3;
-  composer.addPass(taaPass);
+function setupComposer(): void {
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  const pixelRatio = renderer.getPixelRatio();
 
-  smaaPass = new SMAAPass(
-    container.clientWidth * window.devicePixelRatio,
-    container.clientHeight * window.devicePixelRatio
-  );
-  smaaPass.enabled = false;
-  composer.addPass(smaaPass);
+  // Dispose old things
+  if (composer) composer.dispose();
 
+  let renderTarget: THREE.WebGLRenderTarget | undefined;
+
+  // For MSAA, we need a multisampled render target
+  // (Only if WebGL 2 is available, which Three.js usually handles)
+  if (params.aaMode === 'MSAA') {
+    renderTarget = new THREE.WebGLRenderTarget(width * pixelRatio, height * pixelRatio, {
+      samples: 4,
+      type: THREE.HalfFloatType,
+    });
+  }
+
+  composer = new EffectComposer(renderer, renderTarget);
+  composer.setSize(width, height);
+
+  // 1. Render Pass (Basic Scene)
+  // If TAA is enabled, TAARenderPass replaces the standard RenderPass
+  if (params.aaMode === 'TAA') {
+    taaPass = new TAARenderPass(scene, camera);
+    taaPass.sampleLevel = params.taaLevel;
+    taaPass.enabled = true;
+    composer.addPass(taaPass);
+  } else {
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+  }
+
+  // 2. Color Grading (Always applied)
   const ColorGradingShader = {
     uniforms: {
       tDiffuse: { value: null },
@@ -654,22 +696,20 @@ function initThreeJS(): void {
   colorGradingPass = new ShaderPass(ColorGradingShader);
   composer.addPass(colorGradingPass);
 
+  // 3. SMAA (Post-process AA)
+  if (params.aaMode === 'SMAA') {
+    smaaPass = new SMAAPass(width * pixelRatio, height * pixelRatio);
+    smaaPass.enabled = true;
+    composer.addPass(smaaPass);
+  }
+
+  // 4. Vignette (Optional/Disabled currently)
   vignettePass = new ShaderPass(VignetteShader);
   vignettePass.uniforms['darkness'].value = 1.2;
   vignettePass.uniforms['offset'].value = 0.9;
   vignettePass.enabled = false;
-  vignettePass.renderToScreen = true;
+  // vignettePass.renderToScreen = true; // Not strictly needed as it's the last pass usually
   composer.addPass(vignettePass);
-
-  // Handle resize
-  window.addEventListener('resize', () => {
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height);
-    if (composer) composer.setSize(width, height);
-  });
 }
 
 /**
@@ -712,6 +752,19 @@ function setupGUI(): void {
   materialFolder.add(params, 'wireframe').name('Wireframe').onChange(updateMaterial);
   materialFolder.open();
 
+  // Rendering
+  const renderFolder = gui.addFolder('Render Settings');
+
+  renderFolder.add(params, 'aaMode', ['None', 'SMAA', 'MSAA', 'TAA'])
+    .name('Anti-Aliasing')
+    .onChange(() => setupComposer());
+
+  renderFolder.add(params, 'taaLevel', 1, 5, 1)
+    .name('TAA Level')
+    .onChange(() => setupComposer());
+
+  renderFolder.open();
+
   // Export
   const exportFolder = gui.addFolder('Export');
   exportFolder.add({ exportGLB }, 'exportGLB').name('Export GLB');
@@ -723,6 +776,7 @@ function setupGUI(): void {
  */
 function animate(): void {
   requestAnimationFrame(animate);
+  if (stats) stats.update();
   controls.update();
 
   if (animateLights && sideLight && sideLight2) {
