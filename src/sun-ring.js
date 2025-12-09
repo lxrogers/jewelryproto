@@ -30,6 +30,7 @@ let SUN_THICKNESS = 2;     // Default: 2mm (sun width)
 let MOON_DIAMETER = 8;     // Default: 8mm
 let MOON_ANGLE = 180;      // Default: 180 degrees (opposite side from sun)
 let FILLET_RADIUS = 0.3;   // Default: 0.3mm
+let GROUND_OFFSET = 0;     // Default: 0mm (design sits on ground)
 
 // Initialize RepliCAD
 async function initializeReplicad() {
@@ -356,6 +357,7 @@ async function createAndDisplayRing() {
 
         ringMesh = new THREE.Mesh(geometry, material);
         ringMesh.rotation.x = Math.PI / 2;  // Lay flat
+        ringMesh.position.y = GROUND_OFFSET;  // Apply ground offset
         ringMesh.castShadow = true;
         ringMesh.receiveShadow = true;
         scene.add(ringMesh);
@@ -431,13 +433,24 @@ function updateMoonPosition() {
     const x = ringCenterlineRadius * Math.cos(angleRad);
     const z = ringCenterlineRadius * Math.sin(angleRad);
 
-    // Position moon at the calculated position
-    moonMesh.position.set(x, 0, z);
+    // Position moon at the calculated position (including ground offset)
+    moonMesh.position.set(x, GROUND_OFFSET, z);
 
     // Rotate to lay flat like the ring
     moonMesh.rotation.set(Math.PI / 2, 0, 0);
 
-    console.log(`Moon positioned at angle ${MOON_ANGLE.toFixed(0)}° (x=${x.toFixed(2)}, z=${z.toFixed(2)})`);
+    console.log(`Moon positioned at angle ${MOON_ANGLE.toFixed(0)}° (x=${x.toFixed(2)}, y=${GROUND_OFFSET.toFixed(2)}, z=${z.toFixed(2)})`);
+}
+
+// Update ground offset for all meshes (fast Three.js transform, no rebuild)
+function updateGroundOffset() {
+    if (ringMesh) {
+        ringMesh.position.y = GROUND_OFFSET;
+    }
+    if (moonMesh) {
+        moonMesh.position.y = GROUND_OFFSET;
+    }
+    console.log(`Ground offset updated to ${GROUND_OFFSET.toFixed(1)}mm`);
 }
 
 // Preset management functions
@@ -455,7 +468,8 @@ function savePreset() {
         sunWidth: SUN_THICKNESS,
         moonDiameter: MOON_DIAMETER,
         moonAngle: MOON_ANGLE,
-        filletRadius: FILLET_RADIUS
+        filletRadius: FILLET_RADIUS,
+        groundOffset: GROUND_OFFSET
     };
 
     // Get existing presets from localStorage
@@ -496,6 +510,7 @@ function loadPreset() {
     MOON_DIAMETER = preset.moonDiameter || 8;
     MOON_ANGLE = preset.moonAngle || 180;
     FILLET_RADIUS = preset.filletRadius || 0.3;
+    GROUND_OFFSET = preset.groundOffset || 0;
 
     // Update slider values and displays
     document.getElementById('ringWidth').value = RING_WIDTH;
@@ -518,6 +533,9 @@ function loadPreset() {
 
     document.getElementById('filletRadius').value = FILLET_RADIUS;
     document.getElementById('filletRadius-value').textContent = FILLET_RADIUS.toFixed(1) + ' mm';
+
+    document.getElementById('groundOffset').value = GROUND_OFFSET;
+    document.getElementById('groundOffset-value').textContent = GROUND_OFFSET.toFixed(1) + ' mm';
 
     // Recreate the ring
     if (isInitialized) {
@@ -636,11 +654,12 @@ function setupSliders() {
     const sliders = [
         { id: 'ringWidth', variable: 'RING_WIDTH', suffix: ' mm', updateType: 'ring' },
         { id: 'height', variable: 'HEIGHT', suffix: ' mm', updateType: 'both' },
+        { id: 'filletRadius', variable: 'FILLET_RADIUS', suffix: ' mm', updateType: 'both' },  // Fillet affects both ring and moon
+        { id: 'groundOffset', variable: 'GROUND_OFFSET', suffix: ' mm', updateType: 'offset' },
         { id: 'sunDiameter', variable: 'SUN_DIAMETER', suffix: ' mm', updateType: 'ring' },
         { id: 'sunWidth', variable: 'SUN_THICKNESS', suffix: ' mm', updateType: 'ring' },
         { id: 'moonDiameter', variable: 'MOON_DIAMETER', suffix: ' mm', updateType: 'moon' },
-        { id: 'moonAngle', variable: 'MOON_ANGLE', suffix: '°', updateType: 'transform' },
-        { id: 'filletRadius', variable: 'FILLET_RADIUS', suffix: ' mm', updateType: 'both' }  // Fillet affects both ring and moon
+        { id: 'moonAngle', variable: 'MOON_ANGLE', suffix: '°', updateType: 'transform' }
     ];
 
     sliders.forEach(({ id, variable, suffix, updateType }) => {
@@ -660,6 +679,7 @@ function setupSliders() {
             else if (variable === 'MOON_DIAMETER') MOON_DIAMETER = value;
             else if (variable === 'MOON_ANGLE') MOON_ANGLE = value;
             else if (variable === 'FILLET_RADIUS') FILLET_RADIUS = value;
+            else if (variable === 'GROUND_OFFSET') GROUND_OFFSET = value;
 
             if (isInitialized) {
                 if (updateType === 'ring') {
@@ -674,6 +694,9 @@ function setupSliders() {
                 } else if (updateType === 'transform') {
                     // Just update moon position (fast Three.js transform)
                     updateMoonPosition();
+                } else if (updateType === 'offset') {
+                    // Just update ground offset (fast Three.js transform)
+                    updateGroundOffset();
                 }
             }
         });
