@@ -527,7 +527,7 @@ function initThreeJS(): void {
 
   // Load HDRI environment for reflections
   const rgbeLoader = new RGBELoader();
-  rgbeLoader.load('/softbox.hdr', (hdrEquirect) => {
+  rgbeLoader.load('./softbox.hdr', (hdrEquirect) => {
     hdrEquirect.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = hdrEquirect;
     console.log('HDRI environment loaded');

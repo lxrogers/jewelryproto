@@ -1,0 +1,92 @@
+<title>Jewelry Proto Bench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: a jeweler's tray — prototypes grouped by geometry engine, each a slot with its own tag */
+  :root {
+    --bg: #f6f4ef;
+    --surface: #ffffff;
+    --fg: #1f1c17;
+    --muted: #6d6658;
+    --line: #e2ddd1;
+    --gold: #9a6f12;
+    --gold-soft: #f3e8cc;
+    --display: "Syne", "Avenir Next", system-ui, sans-serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #15130f; --surface: #1e1b16; --fg: #eee8dc; --muted: #a39b8a; --line: #332e25; --gold: #e2b94f; --gold-soft: #3a2f16; color-scheme: dark;
+  } }
+  :root[data-theme="dark"] {
+    --bg: #15130f; --surface: #1e1b16; --fg: #eee8dc; --muted: #a39b8a; --line: #332e25; --gold: #e2b94f; --gold-soft: #3a2f16; color-scheme: dark;
+  }
+  body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding-block: 48px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px; }
+  header { display: grid; gap: 10px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+  h1 { font-family: var(--display); font-weight: 700; font-size: clamp(32px, 6vw, 52px); line-height: 1.05; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+  header p { margin: 0; max-width: 62ch; color: var(--muted); }
+  section { display: grid; gap: 14px; }
+  h2 { font-family: var(--display); font-weight: 600; font-size: 20px; margin: 0; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h2 small { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: .02em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+  a.card { display: grid; grid-template-rows: auto 1fr auto; gap: 8px; padding: 18px 18px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; color: inherit; text-decoration: none; transition: border-color .15s, transform .15s; min-width: 0; }
+  a.card:hover { border-color: var(--gold); transform: translateY(-2px); }
+  a.card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .card h3 { margin: 0; font-size: 16px; font-weight: 500; display: flex; justify-content: space-between; gap: 8px; }
+  .card h3 span { color: var(--gold); }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tags i { font-style: normal; font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--gold-soft); color: var(--gold); }
+  footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+  footer code { font-family: var(--mono); font-size: 12px; }
+  @media (prefers-reduced-motion: reduce) { a.card { transition: none; } a.card:hover { transform: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">lxrogers / jewelryproto</div>
+    <h1>Jewelry Proto Bench</h1>
+    <p>Twelve browser prototypes for designing rings and coins in 3D. Each one renders gold under the same softbox HDRI, with sliders for the shape. The B-rep demos load a 10&nbsp;MB OpenCascade kernel, so give them a few seconds on first open.</p>
+  </header>
+
+  <section>
+    <h2>B-rep CAD <small>RepliCAD · OpenCascade WASM</small></h2>
+    <div class="grid">
+      <a class="card" href="ring-configurator.html"><h3>Ring Configurator <span>→</span></h3><p>Parametric band with mesh quality presets, preview and high-quality modes, and vignette / SMAA / TAA post-processing.</p><div class="tags"><i>parametric</i><i>post-fx</i></div></a>
+      <a class="card" href="sun-ring.html"><h3>Sun Ring <span>→</span></h3><p>Flat ring fused with a hollow sun and a separate moon element, animated independently with Three.js transforms.</p><div class="tags"><i>booleans</i><i>animation</i></div></a>
+      <a class="card" href="sun-ring2.html"><h3>Sun Ring 2 <span>→</span></h3><p>The sun ring with animated directional lights, a softer render pipeline, and saved slider presets.</p><div class="tags"><i>lighting</i><i>presets</i></div></a>
+      <a class="card" href="smoothing-test.html"><h3>Smoothing Test <span>→</span></h3><p>Compares Loop and Catmull-Clark subdivision on dense RepliCAD meshes, with adjustable iterations.</p><div class="tags"><i>subdivision</i></div></a>
+    </div>
+  </section>
+
+  <section>
+    <h2>SDF &amp; mesh booleans <small>Manifold WASM</small></h2>
+    <div class="grid">
+      <a class="card" href="sdf-ring-demo.html"><h3>SDF Ring Designer <span>→</span></h3><p>Signed-distance ring meshed by Manifold, refined progressively in a Web Worker. Exports STL.</p><div class="tags"><i>sdf</i><i>worker</i><i>stl</i></div></a>
+      <a class="card" href="manifold-ring-demo.html"><h3>Manifold Ring Designer <span>→</span></h3><p>Ring built from Manifold mesh booleans, with STL export.</p><div class="tags"><i>booleans</i><i>stl</i></div></a>
+      <a class="card" href="sdf-ring-bars-demo.html"><h3>Ring with Bars <span>→</span></h3><p>SDF band crossed by bars, blended into one surface.</p><div class="tags"><i>sdf</i></div></a>
+      <a class="card" href="sdf-plus-cyl-demo.html"><h3>Plus Cylinders <span>→</span></h3><p>Plus-shaped arrangement of cylinders blended as signed-distance fields.</p><div class="tags"><i>sdf</i></div></a>
+      <a class="card" href="oval-wave-demo.html"><h3>Oval Waves <span>→</span></h3><p>Oval band with a wave modulation, meshed from an SDF.</p><div class="tags"><i>sdf</i></div></a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Mesh generators <small>Three.js · three-bvh-csg</small></h2>
+    <div class="grid">
+      <a class="card" href="ring-fillet-demo.html"><h3>Ring Fillet Prototype <span>→</span></h3><p>Ring assembled with BVH CSG, then subdivided to approximate fillets on the joins.</p><div class="tags"><i>csg</i><i>subdivision</i></div></a>
+      <a class="card" href="coin-demo.html"><h3>Coin Mesh Generator <span>→</span></h3><p>Coins generated from outline functions and triangulated faces, tuned with GUI controls.</p><div class="tags"><i>procedural</i></div></a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Generative <small>Three.js · simplex noise · lxrogers/generative-rings-testing</small></h2>
+    <div class="grid">
+      <a class="card" href="generative-ring.html"><h3>Generative Ring <span>→</span></h3><p>Band swept from 200 cross-section loops, shaped by width and height waves plus simplex noise on the outer face. Hit Randomize for a new design.</p><div class="tags"><i>noise</i><i>randomize</i><i>csg</i></div></a>
+    </div>
+  </section>
+
+  <footer>Built from branch <code>claude/prototype-3d-jewelry-011CUqvh36g8ykyrvAZ3Po2i</code> with Vite.</footer>
+</div>

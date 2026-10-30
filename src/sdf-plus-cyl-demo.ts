@@ -229,7 +229,7 @@ function initThree(): void {
   plane.receiveShadow = true;
   scene.add(plane);
 
-  new RGBELoader().load('/softbox.hdr', (hdr) => {
+  new RGBELoader().load('./softbox.hdr', (hdr) => {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = hdr;
   });
